@@ -1,0 +1,67 @@
+{
+  "launch_files": [
+    {"path": "src/Tyre_Inspection_Bot/src/amr_hardware/src/ugv_nav/launch/aurora_testing.launch.py", "package": "ugv_nav"},
+    {"path": "src/Tyre_Inspection_Bot/src/amr_hardware/src/segment_3d/segmentation_3d/launch/segment_3d.launch.py", "package": "segmentation_3d"},
+    {"path": "src/aurora_sdk_bridge/launch/aurora_sdk_bridge.launch.py", "package": "aurora_sdk_bridge"},
+    {"path": "src/Tyre_Inspection_Bot/src/amr_hardware/src/ugv_nav/launch/aurora_calibration.launch.py", "package": "ugv_nav"},
+    {"path": "src/Tyre_Inspection_Bot/src/amr_hardware/src/ugv_nav/launch/aurora_bringup.launch.py", "package": "ugv_nav"},
+    {"path": "src/aurora_interface/launch/aurora_full.launch.py", "package": "aurora_interface"},
+    {"path": "src/Tyre_Inspection_Bot/src/amr_hardware/src/ugv_nav/launch/nav_aurora.launch.py", "package": "ugv_nav"},
+    {"path": "src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/launch/inspection_manager.launch.py", "package": "inspection_manager"},
+    {"path": "src/Tyre_Inspection_Bot/src/amr_hardware/src/ugv_vision/launch/camera.launch.py", "package": "ugv_vision"},
+    {"path": "src/Tyre_Inspection_Bot/src/amr_hardware/src/ugv_vision/launch/apriltag_track.launch.py", "package": "ugv_vision"},
+    {"path": "install/ugv_description/share/ugv_description/launch/display.launch.py", "package": "ugv_description"}
+  ],
+  "nodes": [
+    {"package": "slamware_ros_sdk", "node": "slamware_ros_sdk_server_node", "file": "src/aurora_ros2_sdk_linux/src/slamware_ros_sdk"},
+    {"package": "aurora_sdk_bridge", "node": "aurora_sdk_bridge", "file": "scripts/aurora_sdk_bridge_node.py"},
+    {"package": "segmentation_3d", "node": "ultralytics_segmentation", "file": "scripts/ultralytics_node.py"},
+    {"package": "segmentation_3d", "node": "aurora_camera_info", "file": "scripts/aurora_camera_info_node.py"},
+    {"package": "segmentation_3d", "node": "depth_to_registered_pointcloud", "file": "scripts/depth_to_registered_pointcloud_node.py"},
+    {"package": "segmentation_3d", "node": "segmentation_processor_node", "file": "src/segmentation_processor.cpp"},
+    {"package": "ugv_nav", "node": "depth_gate", "file": "scripts/depth_gate_node.py"},
+    {"package": "ugv_nav", "node": "nav_lifecycle_startup", "file": "scripts/nav_lifecycle_startup.py"},
+    {"package": "aurora_interface", "node": "aurora_health_monitor", "file": "scripts/aurora_health_monitor.py"},
+    {"package": "inspection_manager", "node": "inspection_manager", "file": "inspection_manager_node.py"},
+    {"package": "inspection_manager", "node": "photo_capture_service", "file": "photo_capture_service.py"},
+    {"package": "ugv_base_driver", "node": "depth_gate", "file": "scripts/depth_gate_node.py"},
+    {"package": "ugv_vision", "node": "camera_node", "file": "launch/camera.launch.py"},
+    {"package": "tf2_ros", "node": "static_transform_publisher", "file": "multiple launch files"}
+  ],
+  "topics": [
+    {"topic": "/slamware_ros_sdk_server_node/left_image_raw", "type": "sensor_msgs/Image", "publisher": "slamware_ros_sdk_server_node"},
+    {"topic": "/slamware_ros_sdk_server_node/right_image_raw", "type": "sensor_msgs/Image", "publisher": "slamware_ros_sdk_server_node"},
+    {"topic": "/camera/depth/image", "type": "sensor_msgs/Image", "publisher": "aurora_sdk_bridge"},
+    {"topic": "/camera/depth/camera_info", "type": "sensor_msgs/CameraInfo", "publisher": "aurora_sdk_bridge"},
+    {"topic": "/camera/depth/points", "type": "sensor_msgs/PointCloud2", "publisher": "aurora_sdk_bridge"},
+    {"topic": "/stereo/navigation_permitted", "type": "std_msgs/Bool", "publisher": "aurora_sdk_bridge"},
+    {"topic": "/slamware_ros_sdk_server_node/scan", "type": "sensor_msgs/LaserScan", "publisher": "slamware_ros_sdk_server_node"},
+    {"topic": "/slamware_ros_sdk_server_node/odom", "type": "nav_msgs/Odometry", "publisher": "slamware_ros_sdk_server_node"},
+    {"topic": "/slamware_ros_sdk_server_node/map", "type": "nav_msgs/OccupancyGrid", "publisher": "slamware_ros_sdk_server_node"},
+    {"topic": "/segmentation_processor/registered_pointcloud", "type": "sensor_msgs/PointCloud2", "publisher": "depth_to_registered_pointcloud_node"},
+    {"topic": "/darknet_ros_3d/bounding_boxes", "type": "gb_visual_detection_3d_msgs/BoundingBoxes3d", "publisher": "segmentation_processor_node"},
+    {"topic": "cmd_vel_nav", "type": "geometry_msgs/Twist", "publisher": "Nav2"},
+    {"topic": "cmd_vel", "type": "geometry_msgs/Twist", "publisher": "depth_gate_node"}
+  ],
+  "calibration_files": [
+    {"path": "src/aurora_sdk_bridge/config/equidistant_calibration.yaml", "purpose": "Fisheye stereo calibration for aurora_sdk_bridge"},
+    {"path": "install/segmentation_3d/share/segmentation_3d/config/camera_calibration/stereo_calib.yaml", "purpose": "Plumb-bob stereo calibration (legacy)"},
+    {"path": "aurora_remote_sdk_demo/demo/calibration_exporter", "purpose": "SDK calibration exporter"}
+  ],
+  "config_files": {
+    "nav2": [
+      {"path": "src/Tyre_Inspection_Bot/src/amr_hardware/src/ugv_nav/param/nav_aurora.yaml", "description": "Nav2 params for Aurora"}
+    ],
+    "stereo": [
+      {"path": "install/segmentation_3d/share/segmentation_3d/config/config_stereo.yaml", "description": "Legacy stereo depth config"},
+      {"path": "install/segmentation_3d/share/segmentation_3d/config/config_stereo_production.yaml", "description": "Production stereo config"}
+    ],
+    "depth": [
+      {"path": "src/Tyre_Inspection_Bot/src/amr_hardware/src/segment_3d/segmentation_3d/config/config.yaml", "description": "Segmentation processor config"}
+    ]
+  },
+  "aurora_remote_sdk_demo": {
+    "demos": ["simple_pose", "vslam_map_saveload", "depthcam_view", "frame_preview", "calibration_exporter", "map_render", "lidar_scan_plot", "imu_fetcher", "device_info_monitor", "colmap_recorder", "semantic_segmentation", "lidar_2dmap_render", "relocalization", "pure_c_demo", "time_sync", "transform_manager"],
+    "relevant_to_stereo_depth": ["depthcam_view", "frame_preview", "calibration_exporter"]
+  }
+}
