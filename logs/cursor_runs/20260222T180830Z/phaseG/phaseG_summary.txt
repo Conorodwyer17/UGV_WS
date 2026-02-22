@@ -1,0 +1,16 @@
+Phase G - Navigation Safety Gating - Summary
+==========================================
+2026-02-22
+
+1. DEPTH_GATE HARDENING
+   - nav_permitted_default: False (fail-safe when no message)
+   - stale_timeout_s: 0.3 (halt if no nav_permitted for 300ms)
+   - On timeout: treat as not permitted, publish zero twist
+
+2. MODIFIED FILE
+   - ugv_nav/scripts/depth_gate_node.py
+
+3. ACCEPTANCE
+   - Cover camera -> nav_permitted False -> halt
+   - Kill stereo node -> no messages -> timeout -> halt
+   - Restore depth -> nav_permitted True -> resume
