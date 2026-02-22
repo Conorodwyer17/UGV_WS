@@ -1,0 +1,7 @@
+               Local time: Sun 2026-02-22 18:15:10 GMT
+           Universal time: Sun 2026-02-22 18:15:10 UTC
+                 RTC time: Sun 2026-02-22 18:15:11
+                Time zone: Europe/Dublin (GMT, +0000)
+System clock synchronized: yes
+              NTP service: active
+          RTC in local TZ: no

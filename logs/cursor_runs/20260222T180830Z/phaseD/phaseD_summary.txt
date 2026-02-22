@@ -1,0 +1,23 @@
+Phase D - TF Determinism - Summary
+==================================
+2026-02-22
+
+1. MODIFICATIONS
+   - segmentation_processor: tf_max_age_ms param (default 250 ms)
+   - Reject frames when transform age > tf_max_age_ms; throttled WARN (5s)
+   - config.yaml: tf_max_age_ms: 250
+   - tf_latency_trace.py: 60s histogram script (requires live ROS)
+
+2. TF CHAIN (Aurora)
+   - camera_left -> base_link -> odom -> slamware_map
+   - Static: slamware_map->odom, base_link->camera_left, camera_left->camera_right,
+     camera_left->camera_depth_optical_frame
+
+3. STARTUP GATING
+   - depth_to_registered_pointcloud: already gates on camera_info_received
+   - segmentation_processor: canTransform + tf_max_age before processing
+
+4. ACCEPTANCE
+   - tf_max_age check: IMPLEMENTED
+   - Zero TF extrapolation: rejection of stale frames (age > 250ms)
+   - tf_latency_trace: script ready; run with live system for metrics
