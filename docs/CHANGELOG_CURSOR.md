@@ -34,3 +34,10 @@
 #### Result
 - Depth consistency: PASS (0% error)
 - RMS: Pending live checkerboard (40-60 pairs)
+
+### Phase D - TF Determinism (2026-02-22)
+
+#### Actions
+- segmentation_processor: tf_max_age_ms (250), reject stale frames
+- tf_latency_trace.py: 60s histogram script
+- config: tf_max_age_ms: 250
