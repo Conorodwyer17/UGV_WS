@@ -1,8 +1,0 @@
-
-=== /home/conor/ugv_ws/src/aurora_sdk_bridge/config/equidistant_calibration.yaml ===
-  Valid: True
-  WARN: rms_error undocumented
-
-=== /home/conor/ugv_ws/src/Tyre_Inspection_Bot/src/amr_hardware/src/segment_3d/segmentation_3d/config/stereo_calibration_verified.yaml ===
-  Valid: True
-  WARN: rms_error undocumented

@@ -1,6 +1,0 @@
-ERROR: Reprojection error 72.26 px at (u=269.5,v=209.5) z=1.0m
-ERROR: Reprojection error 57.81 px at (u=359.5,v=259.5) z=1.0m
-ERROR: Reprojection error 72.26 px at (u=269.5,v=209.5) z=1.5m
-ERROR: Reprojection error 57.81 px at (u=359.5,v=259.5) z=1.5m
-Depth error stats: mean=0.00% max=0.00%
-PASSED: False
