@@ -1,0 +1,138 @@
+# NOTE: Representative diff hunks (for review only; not intended to apply).
+
+diff --git a/src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/inspection_manager/inspection_manager_node.py b/src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/inspection_manager/inspection_manager_node.py
+--- a/src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/inspection_manager/inspection_manager_node.py
++++ b/src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/inspection_manager/inspection_manager_node.py
+@@
+ from tf2_ros import TransformException
+ import tf2_geometry_msgs
++from .utils import should_trigger_photo
+@@
+     self.declare_parameter("capture_result_topic", "/inspection_manager/capture_result")  # SUCCESS|FAILURE,filename,bytes from photo_capture_service
++    self.declare_parameter("photo_trigger_distance", 0.0)  # meters; 0 disables distance gate before capture
+@@
+     self.get_logger().info(f"State transition: {self.current_state} -> {new_state} (cause: {self._last_transition_cause})")
++    self.get_logger().info(
++        f"MISSION_STATE: {new_state} (from {prev_state}, cause={self._last_transition_cause})"
++    )
+@@
+     if self.current_state == MissionState.SEARCH_VEHICLE:
+         return
++    if not boxes:
++        if self.current_state == MissionState.WAIT_VEHICLE_BOX:
++            self.get_logger().error("DETECTION_MISSING: no vehicle boxes received while in WAIT_VEHICLE_BOX")
++            self._mission_log_append("detection_missing", {
++                "state": self.current_state,
++                "topic": self.get_parameter("vehicle_boxes_topic").value,
++                "labels": vehicle_labels,
++            })
++        return
+@@
+         if vehicle_box:
+             ...
+         else:
++            self.get_logger().error(
++                f"DETECTION_FILTERED: boxes received but none passed filters "
++                f"(labels={vehicle_labels}, min_prob={min_vehicle_prob:.2f})"
++            )
++            self._mission_log_append("detection_filtered", {
++                "state": self.current_state,
++                "labels": vehicle_labels,
++                "min_vehicle_probability": min_vehicle_prob,
++            })
+@@
+     self.get_logger().info(
+         f"Sending navigation goal:\n"
+         f"  Frame: {goal.header.frame_id}\n"
+         f"  Goal position: ({goal.pose.position.x:.3f}, {goal.pose.position.y:.3f}, {goal.pose.position.z:.3f})\n"
+         f"  Orientation (yaw): {math.degrees(heading):.2f}°\n"
+         f"  Offset from object: {offset:.3f}m\n"
+         f"  Distance robot->goal: {math.sqrt((goal.pose.position.x - robot_x)**2 + (goal.pose.position.y - robot_y)**2):.3f}m"
+     )
++    self.get_logger().info(
++        f"GOAL_COMPUTED: frame={goal.header.frame_id} "
++        f"pos=({goal.pose.position.x:.3f},{goal.pose.position.y:.3f},{goal.pose.position.z:.3f}) "
++        f"yaw_deg={math.degrees(heading):.1f} offset={offset:.3f} dist_to_object={dist:.3f}"
++    )
+@@
+     ok = self._send_nav_goal(goal, self._on_box_goal_done)
+     if not ok:
++        self.get_logger().error(
++            f"NAV_COMMAND_FAILED: goal_frame={goal.header.frame_id} "
++            f"pos=({goal.pose.position.x:.3f},{goal.pose.position.y:.3f},{goal.pose.position.z:.3f})"
++        )
++        self._mission_log_append("nav_command_failed", {...})
+     else:
++        self.get_logger().info(
++            f"NAV_COMMAND_SENT: goal_frame={goal.header.frame_id} "
++            f"pos=({goal.pose.position.x:.3f},{goal.pose.position.y:.3f},{goal.pose.position.z:.3f}) "
++            f"yaw_deg={math.degrees(heading):.1f}"
++        )
++        self._mission_log_append("nav_command_sent", {...})
+@@
+     if self.current_state == MissionState.INSPECT_TIRE:
++        trigger_threshold = float(self.get_parameter("photo_trigger_distance").value)
++        distance_to_goal = ...
++        self._mission_log_append("photo_trigger_distance_check", {...})
++        if not should_trigger_photo(distance_to_goal, trigger_threshold):
++            self.get_logger().error(
++                f"Photo trigger blocked: distance_to_goal={distance_to_goal} > threshold={trigger_threshold}"
++            )
++            self._mission_log_append("photo_trigger_blocked", {...})
++            self._set_state(MissionState.WAIT_TIRE_BOX, cause="photo_trigger_distance")
++            return
+
+diff --git a/src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/inspection_manager/utils.py b/src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/inspection_manager/utils.py
+new file mode 100644
+--- /dev/null
++++ b/src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/inspection_manager/utils.py
+@@
++from typing import Optional
++
++
++def should_trigger_photo(distance_m: Optional[float], threshold_m: float) -> bool:
++    """Return True if photo should trigger based on distance threshold."""
++    if threshold_m <= 0:
++        return True  # disabled
++    if distance_m is None:
++        return True  # cannot validate; do not block capture
++    return distance_m <= threshold_m
+
+diff --git a/src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/test/test_photo_trigger.py b/src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/test/test_photo_trigger.py
+new file mode 100644
+--- /dev/null
++++ b/src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/test/test_photo_trigger.py
+@@
++from inspection_manager.utils import should_trigger_photo
++
++
++def test_photo_trigger_within_distance():
++    assert should_trigger_photo(0.2, 0.5) is True
++
++
++def test_photo_trigger_blocks_when_far():
++    assert should_trigger_photo(0.6, 0.5) is False
++
++
++def test_photo_trigger_disabled_threshold():
++    assert should_trigger_photo(1.5, 0.0) is True
++
++
++def test_photo_trigger_unknown_distance():
++    assert should_trigger_photo(None, 0.5) is True
+
+diff --git a/src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/package.xml b/src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/package.xml
+--- a/src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/package.xml
++++ b/src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/package.xml
+@@
+   <test_depend>ament_lint_auto</test_depend>
+   <test_depend>ament_lint_common</test_depend>
++  <test_depend>python3-pytest</test_depend>
+
+diff --git a/PRODUCTION_CONFIG.yaml b/PRODUCTION_CONFIG.yaml
+--- a/PRODUCTION_CONFIG.yaml
++++ b/PRODUCTION_CONFIG.yaml
+@@
+     # Photo capture (photo_capture_service)
++    photo_trigger_distance: 0.0  # meters; 0 disables distance gate before capture
+     save_directory: "~/ugv_ws/tire_inspection_photos"
