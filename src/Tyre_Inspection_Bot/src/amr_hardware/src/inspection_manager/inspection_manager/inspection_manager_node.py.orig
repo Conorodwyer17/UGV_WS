@@ -8,7 +8,7 @@ import rclpy
 from rclpy.action import ActionClient
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
-from geometry_msgs.msg import PoseStamped, Quaternion, Twist
+from geometry_msgs.msg import PoseStamped, Quaternion
 from nav2_msgs.action import NavigateToPose
 from std_msgs.msg import Bool, Header, String
 from gb_visual_detection_3d_msgs.msg import BoundingBoxes3d, BoundingBox3d
@@ -18,7 +18,6 @@ import tf2_ros
 from tf2_ros import TransformException
 import tf2_geometry_msgs
 
-from .utils import should_trigger_photo
 
 def quaternion_from_yaw(yaw: float) -> Quaternion:
     """Create a geometry_msgs/Quaternion from a yaw angle (Z-axis rotation)."""
@@ -48,8 +47,6 @@ def yaw_from_quaternion(q: Quaternion) -> float:
     cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z)
     yaw = math.atan2(siny_cosp, cosy_cosp)
     return yaw
-
-
 
 
 class MissionState:
@@ -89,16 +86,6 @@ class VehicleInspectionManager(Node):
         self.declare_parameter("rotation_angle", 0.785)  # 45 degrees in radians
         self.declare_parameter("max_rotation_attempts", 8)  # 8 * 45 = 360 degrees
         self.declare_parameter("rotation_position_offset", 0.1)  # Small forward offset to force Nav2 execution
-        # Motion watchdogs and cmd_vel validation
-        self.declare_parameter("cmd_vel_topic", "/cmd_vel")
-        self.declare_parameter("cmd_vel_nav_topic", "/cmd_vel_nav")
-        self.declare_parameter("cmd_vel_timeout_s", 2.0)  # seconds after nav goal with no cmd_vel
-        self.declare_parameter("dispatch_fail_abort_count", 3)  # consecutive dispatch failures before ERROR
-        self.declare_parameter("progress_stall_timeout_s", 5.0)  # seconds with no forward progress
-        self.declare_parameter("progress_min_delta_m", 0.05)  # meters of progress required per window
-        self.declare_parameter("spin_detect_yaw_deg", 90.0)  # degrees of rotation without progress
-        self.declare_parameter("spin_detect_distance_m", 0.1)  # max translation during spin
-        self.declare_parameter("spin_detect_min_time_s", 3.0)  # minimum window before spin detection
         self.declare_parameter("segmentation_mode_topic", "/segmentation_mode")  # Topic to control segmentation model
         self.declare_parameter("tire_position_tolerance", 0.5)  # meters - tires closer than this are considered the same
         self.declare_parameter("max_tire_distance_from_vehicle", 5.0)  # meters - tires beyond this are from other vehicles
@@ -110,7 +97,6 @@ class VehicleInspectionManager(Node):
         self.declare_parameter("photo_capture_topic", "/inspection_manager/capture_photo")  # Topic to trigger photo capture
         self.declare_parameter("capture_metadata_topic", "/inspection_manager/capture_metadata")  # JSON metadata for each capture (pose, tire_class, etc.)
         self.declare_parameter("capture_result_topic", "/inspection_manager/capture_result")  # SUCCESS|FAILURE,filename,bytes from photo_capture_service
-        self.declare_parameter("photo_trigger_distance", 0.0)  # meters; 0 disables distance gate before capture
         self.declare_parameter("vehicle_detected_topic", "/inspection_manager/vehicle_detected")  # JSON: vehicle_id, frame_id, x,y,z,yaw, confidence, timestamp (anchor)
         self.declare_parameter("max_state_repeats", 3)  # Spin protection: transition to ERROR if same state entered this many times consecutively
         self.declare_parameter("expected_tires_per_vehicle", 4)  # For mission completion validation
@@ -193,17 +179,6 @@ class VehicleInspectionManager(Node):
         # Phase A/D: Current goal for diagnostics and dry-run
         self._current_goal_pose: Optional[PoseStamped] = None
 
-        # Cmd_vel monitoring
-        self._last_cmd_vel_time: Optional[float] = None
-        self._last_cmd_vel_msg: Optional[Twist] = None
-        self._last_cmd_vel_source: Optional[str] = None
-
-        # Dispatch and progress watchdogs
-        self._dispatch_fail_count = 0
-        self._last_goal_dispatch_time: Optional[float] = None
-        self._progress_window_start: Optional[float] = None
-        self._progress_start_pose: Optional[tuple] = None  # (x, y, yaw)
-
         # Phase A: State transition cause
         self._last_transition_cause = "init"
         # Last failure reason from _dispatch_box_goal (for mission log)
@@ -279,19 +254,6 @@ class VehicleInspectionManager(Node):
             String,
             self.get_parameter("capture_result_topic").value,
             self._capture_result_cb,
-            10,
-        )
-        # Monitor cmd_vel to detect missing/blocked motion after goal dispatch
-        self._cmd_vel_sub = self.create_subscription(
-            Twist,
-            self.get_parameter("cmd_vel_topic").value,
-            lambda msg: self._cmd_vel_cb(msg, self.get_parameter("cmd_vel_topic").value),
-            10,
-        )
-        self._cmd_vel_nav_sub = self.create_subscription(
-            Twist,
-            self.get_parameter("cmd_vel_nav_topic").value,
-            lambda msg: self._cmd_vel_cb(msg, self.get_parameter("cmd_vel_nav_topic").value),
             10,
         )
         self.create_subscription(
@@ -418,9 +380,6 @@ class VehicleInspectionManager(Node):
             self._state_repeat_count = 0
 
         self.get_logger().info(f"State transition: {self.current_state} -> {new_state} (cause: {self._last_transition_cause})")
-        self.get_logger().info(
-            f"MISSION_STATE: {new_state} (from {prev_state}, cause={self._last_transition_cause})"
-        )
         self._mission_log_append("state_transition", {
             "from": prev_state, "to": new_state, "cause": cause,
         })
@@ -457,8 +416,8 @@ class VehicleInspectionManager(Node):
             self.rotation_attempts = 0
         elif new_state == MissionState.SEARCH_VEHICLE:
             self.wait_start_time = time.time()
-            # Reset rotation attempts only when starting fresh from IDLE
-            if prev_state == MissionState.IDLE:
+            # Reset rotation attempts when starting fresh from IDLE or returning from rotation
+            if prev_state == MissionState.IDLE or prev_state == MissionState.TURN_IN_PLACE_SEARCH:
                 self.rotation_attempts = 0
             current_yaw = self._get_current_yaw()
             self.initial_wait_yaw = current_yaw
@@ -469,8 +428,6 @@ class VehicleInspectionManager(Node):
             # Don't reset rotation_attempts here - keep it for the next wait cycle
         if new_state == MissionState.APPROACH_VEHICLE or new_state == MissionState.INSPECT_TIRE:
             self._approach_entered_time = time.time()
-            self._progress_window_start = None
-            self._progress_start_pose = None
         else:
             self._approach_entered_time = None
 
@@ -535,21 +492,6 @@ class VehicleInspectionManager(Node):
                 "tires_captured": self._total_tires_captured,
                 "vehicles_detected": len(self.detected_vehicles),
                 "mission_elapsed_s": (time.time() - self._mission_start_time) if self._mission_start_time else 0,
-                "last_cmd_vel": {
-                    "linear": {
-                        "x": self._last_cmd_vel_msg.linear.x,
-                        "y": self._last_cmd_vel_msg.linear.y,
-                        "z": self._last_cmd_vel_msg.linear.z,
-                    },
-                    "angular": {
-                        "x": self._last_cmd_vel_msg.angular.x,
-                        "y": self._last_cmd_vel_msg.angular.y,
-                        "z": self._last_cmd_vel_msg.angular.z,
-                    },
-                } if self._last_cmd_vel_msg else None,
-                "last_cmd_vel_time": self._last_cmd_vel_time,
-                "last_cmd_vel_source": self._last_cmd_vel_source,
-                "dispatch_fail_count": self._dispatch_fail_count,
             }
             msg = String()
             msg.data = json.dumps(diag, default=str)
@@ -700,10 +642,6 @@ class VehicleInspectionManager(Node):
         msg.data = json.dumps(payload)
         self.vehicle_detected_pub.publish(msg)
         self.get_logger().info(f"Published vehicle_detected: vehicle_id={vehicle_id} pose=({x:.3f},{y:.3f},{z:.3f}) yaw={math.degrees(yaw):.1f}° conf={confidence:.2f}")
-        self.get_logger().info(
-            f"DETECTION_EVENT: vehicle_id={vehicle_id} frame={frame_id} "
-            f"pos=({x:.3f},{y:.3f},{z:.3f}) yaw_deg={math.degrees(yaw):.1f} conf={confidence:.2f}"
-        )
         self._mission_log_append("vehicle_detected", {
             "vehicle_id": vehicle_id, "frame_id": "map", "x": x, "y": y, "z": z, "yaw": yaw, "confidence": confidence,
         })
@@ -713,12 +651,6 @@ class VehicleInspectionManager(Node):
         if msg.data:
             self._mission_start_requested = True
             self.get_logger().info("Start mission requested via topic.")
-
-    def _cmd_vel_cb(self, msg: Twist, source: str) -> None:
-        """Track last cmd_vel for watchdog diagnostics."""
-        self._last_cmd_vel_time = time.time()
-        self._last_cmd_vel_msg = msg
-        self._last_cmd_vel_source = source
 
     def _rotate_mission_logs(self) -> None:
         """On mission start: archive existing mission_latest.* to timestamped files so each run has a clear log."""
@@ -873,81 +805,6 @@ class VehicleInspectionManager(Node):
         # Phase C: TF watchdog - do not progress if TF invalid
         if not self._check_tf_watchdog():
             return
-
-        # Fail hard after repeated dispatch failures
-        if self._dispatch_fail_count >= self.get_parameter("dispatch_fail_abort_count").value:
-            self.get_logger().error(
-                f"Dispatch failure count {self._dispatch_fail_count} exceeded threshold; aborting mission."
-            )
-            self._mission_log_append("dispatch_fail_abort", {
-                "count": self._dispatch_fail_count,
-                "state": self.current_state,
-                "reason": self._last_dispatch_fail_reason,
-            })
-            self._mission_report["error_states_encountered"] += 1
-            self._set_state(MissionState.ERROR, cause="dispatch_failures")
-            return
-
-        # Watchdog: goal sent but no cmd_vel seen
-        if self._last_goal_dispatch_time is not None:
-            cmd_timeout = self.get_parameter("cmd_vel_timeout_s").value
-            now = time.time()
-            if self._last_cmd_vel_time is None or (now - self._last_cmd_vel_time) > cmd_timeout:
-                if (now - self._last_goal_dispatch_time) > cmd_timeout:
-                    self.get_logger().error(
-                        f"No cmd_vel within {cmd_timeout}s after goal dispatch; likely motion blocked."
-                    )
-                    self._mission_log_append("cmd_vel_timeout", {
-                        "timeout_s": cmd_timeout,
-                        "state": self.current_state,
-                        "last_goal_dispatch_time": self._last_goal_dispatch_time,
-                        "last_cmd_vel_time": self._last_cmd_vel_time,
-                        "last_cmd_vel_source": self._last_cmd_vel_source,
-                    })
-                    # Clear to avoid spamming every tick
-                    self._last_goal_dispatch_time = None
-
-        # Progress watchdog: detect stall or spin during active motion
-        if self.current_state in (MissionState.APPROACH_VEHICLE, MissionState.INSPECT_TIRE):
-            pose = self._get_current_pose()
-            yaw = self._get_current_yaw()
-            now = time.time()
-            if pose and yaw is not None:
-                if self._progress_window_start is None:
-                    self._progress_window_start = now
-                    self._progress_start_pose = (pose.pose.position.x, pose.pose.position.y, yaw)
-                else:
-                    elapsed = now - self._progress_window_start
-                    if elapsed >= self.get_parameter("progress_stall_timeout_s").value:
-                        sx, sy, syaw = self._progress_start_pose
-                        dx = pose.pose.position.x - sx
-                        dy = pose.pose.position.y - sy
-                        dist = math.sqrt(dx * dx + dy * dy)
-                        yaw_delta = abs(math.degrees(yaw - syaw))
-                        if yaw_delta > 180.0:
-                            yaw_delta = 360.0 - yaw_delta
-                        if dist < self.get_parameter("progress_min_delta_m").value:
-                            self._mission_log_append("progress_stall", {
-                                "state": self.current_state,
-                                "elapsed_s": round(elapsed, 1),
-                                "distance_m": round(dist, 3),
-                                "yaw_delta_deg": round(yaw_delta, 1),
-                            })
-                        if (
-                            elapsed >= self.get_parameter("spin_detect_min_time_s").value
-                            and dist < self.get_parameter("spin_detect_distance_m").value
-                            and yaw_delta >= self.get_parameter("spin_detect_yaw_deg").value
-                        ):
-                            self.get_logger().error("Spin detected without progress; dumping diagnostics.")
-                            self._mission_log_append("spin_detected", {
-                                "state": self.current_state,
-                                "elapsed_s": round(elapsed, 1),
-                                "distance_m": round(dist, 3),
-                                "yaw_delta_deg": round(yaw_delta, 1),
-                            })
-                        # reset window
-                        self._progress_window_start = now
-                        self._progress_start_pose = (pose.pose.position.x, pose.pose.position.y, yaw)
 
         # Phase J: Hard mission timeout
         if self._mission_start_time is not None:
@@ -1301,17 +1158,6 @@ class VehicleInspectionManager(Node):
 
         if self.current_state == MissionState.SEARCH_VEHICLE:
             return
-        if not boxes:
-            if self.current_state == MissionState.WAIT_VEHICLE_BOX:
-                self.get_logger().error(
-                    "DETECTION_MISSING: no vehicle boxes received while in WAIT_VEHICLE_BOX"
-                )
-                self._mission_log_append("detection_missing", {
-                    "state": self.current_state,
-                    "topic": self.get_parameter("vehicle_boxes_topic").value,
-                    "labels": vehicle_labels,
-                })
-            return
         if self.current_state == MissionState.WAIT_VEHICLE_BOX:
             target_pos = None
             if self.current_vehicle_idx < len(self.detected_vehicles):
@@ -1339,16 +1185,6 @@ class VehicleInspectionManager(Node):
                     self._simulate_approach_success()
                 else:
                     self._set_state(MissionState.APPROACH_VEHICLE, cause="vehicle_detected")
-            else:
-                self.get_logger().error(
-                    f"DETECTION_FILTERED: boxes received but none passed filters "
-                    f"(labels={vehicle_labels}, min_prob={min_vehicle_prob:.2f})"
-                )
-                self._mission_log_append("detection_filtered", {
-                    "state": self.current_state,
-                    "labels": vehicle_labels,
-                    "min_vehicle_probability": min_vehicle_prob,
-                })
             return
 
     def _detection_cb(self, msg: BoundingBoxes3d):
@@ -1679,7 +1515,6 @@ class VehicleInspectionManager(Node):
                 f"Cannot get robot pose in {world_frame} frame! Cannot compute goal."
             )
             self._last_dispatch_fail_reason = "robot_pose_unavailable"
-            self._dispatch_fail_count += 1
             return False
         
         robot_x = robot_pose.pose.position.x
@@ -1754,21 +1589,6 @@ class VehicleInspectionManager(Node):
             f"  Offset from object: {offset:.3f}m\n"
             f"  Distance robot->goal: {math.sqrt((goal.pose.position.x - robot_x)**2 + (goal.pose.position.y - robot_y)**2):.3f}m"
         )
-        self.get_logger().info(
-            f"GOAL_COMPUTED: frame={goal.header.frame_id} "
-            f"pos=({goal.pose.position.x:.3f},{goal.pose.position.y:.3f},{goal.pose.position.z:.3f}) "
-            f"yaw_deg={math.degrees(heading):.1f} offset={offset:.3f} dist_to_object={dist:.3f}"
-        )
-        self._mission_log_append("goal_computed", {
-            "frame": goal.header.frame_id,
-            "x": goal.pose.position.x,
-            "y": goal.pose.position.y,
-            "z": goal.pose.position.z,
-            "yaw_deg": math.degrees(heading),
-            "offset": offset,
-            "distance_to_object": dist,
-            "state": self.current_state,
-        })
 
         # Phase D: Goal validation - distance check
         goal_dist = math.sqrt((goal.pose.position.x - center_x)**2 + (goal.pose.position.y - center_y)**2)
@@ -1783,36 +1603,9 @@ class VehicleInspectionManager(Node):
         self._current_goal_pose = goal
         ok = self._send_nav_goal(goal, self._on_box_goal_done)
         if not ok:
-            self.get_logger().error(
-                f"NAV_COMMAND_FAILED: goal_frame={goal.header.frame_id} "
-                f"pos=({goal.pose.position.x:.3f},{goal.pose.position.y:.3f},{goal.pose.position.z:.3f})"
-            )
-            self._mission_log_append("nav_command_failed", {
-                "frame": goal.header.frame_id,
-                "x": goal.pose.position.x,
-                "y": goal.pose.position.y,
-                "z": goal.pose.position.z,
-                "state": self.current_state,
-            })
             self._last_dispatch_fail_reason = "nav2_unavailable"
-            self._dispatch_fail_count += 1
         else:
             self._last_dispatch_fail_reason = None
-            self._dispatch_fail_count = 0
-            self._last_goal_dispatch_time = time.time()
-            self.get_logger().info(
-                f"NAV_COMMAND_SENT: goal_frame={goal.header.frame_id} "
-                f"pos=({goal.pose.position.x:.3f},{goal.pose.position.y:.3f},{goal.pose.position.z:.3f}) "
-                f"yaw_deg={math.degrees(heading):.1f}"
-            )
-            self._mission_log_append("nav_command_sent", {
-                "frame": goal.header.frame_id,
-                "x": goal.pose.position.x,
-                "y": goal.pose.position.y,
-                "z": goal.pose.position.z,
-                "yaw_deg": math.degrees(heading),
-                "state": self.current_state,
-            })
         return ok
 
     def _simulate_approach_success(self) -> None:
@@ -2049,9 +1842,6 @@ class VehicleInspectionManager(Node):
             f"  Status: {status} ({'SUCCESS' if nav_succeeded else 'FAILED' if status == 2 else 'OTHER'})\n"
             f"  Current state: {self.current_state}"
         )
-        self.get_logger().info(
-            f"NAV_FEEDBACK: goal=box status={status} success={nav_succeeded} state={self.current_state}"
-        )
         self._mission_log_append("nav_result", {
             "goal": "box", "status": int(status), "success": nav_succeeded,
             "state": self.current_state, "nav_retry_count": self._nav_retry_count,
@@ -2109,30 +1899,6 @@ class VehicleInspectionManager(Node):
             return
 
         if self.current_state == MissionState.INSPECT_TIRE:
-            trigger_threshold = float(self.get_parameter("photo_trigger_distance").value)
-            distance_to_goal = None
-            if self._current_goal_pose is not None:
-                pose_map = self._get_current_pose_in_map_frame()
-                if pose_map is not None:
-                    dx = pose_map.pose.position.x - self._current_goal_pose.pose.position.x
-                    dy = pose_map.pose.position.y - self._current_goal_pose.pose.position.y
-                    distance_to_goal = math.sqrt(dx * dx + dy * dy)
-            self._mission_log_append("photo_trigger_distance_check", {
-                "distance_to_goal": distance_to_goal,
-                "threshold": trigger_threshold,
-                "state": self.current_state,
-            })
-            if not should_trigger_photo(distance_to_goal, trigger_threshold):
-                self.get_logger().error(
-                    f"Photo trigger blocked: distance_to_goal={distance_to_goal} > threshold={trigger_threshold}"
-                )
-                self._mission_log_append("photo_trigger_blocked", {
-                    "distance_to_goal": distance_to_goal,
-                    "threshold": trigger_threshold,
-                    "state": self.current_state,
-                })
-                self._set_state(MissionState.WAIT_TIRE_BOX, cause="photo_trigger_distance")
-                return
             if self._tire_registry:
                 self._tire_registry[-1]["visited"] = True
             self._current_goal_pose = None
