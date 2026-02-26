@@ -2,6 +2,7 @@
 #include "point_processor.hpp"
 #include <pcl_conversions/pcl_conversions.h>
 #include <limits>
+#include <numeric>
 #include <algorithm>
 #include <cctype>
 #include <chrono>
@@ -52,6 +53,9 @@ void SegmentationProcessor::initParams() {
     working_frame_ = "map";
     mininum_detection_threshold_ = 0.5f;
     minimum_probability_ = 0.3f;
+    min_valid_points_tire_ = 3;
+    tire_cluster_tolerance_ = 0.18f;
+    tire_max_distance_m_ = 12.0f;
 
     this->declare_parameter("input_segment_topic", input_segment_topic_);
     this->declare_parameter("output_bbx3d_topic", output_bbx3d_topic_);
@@ -61,9 +65,14 @@ void SegmentationProcessor::initParams() {
     this->declare_parameter("working_frame", working_frame_);
     this->declare_parameter("mininum_detection_threshold", mininum_detection_threshold_);
     this->declare_parameter("minimum_probability", minimum_probability_);
+    this->declare_parameter("min_valid_points_tire", min_valid_points_tire_);
+    this->declare_parameter("tire_cluster_tolerance", tire_cluster_tolerance_);
+    this->declare_parameter("tire_max_distance_m", tire_max_distance_m_);
     this->declare_parameter("interested_classes", std::vector<std::string>{"car", "truck", "car-tire"});
     this->declare_parameter("min_valid_points", 5);
     this->declare_parameter("tf_max_age_ms", 250);
+    this->declare_parameter("segment_image_width", 640);   // Aurora left_image_raw 640x480
+    this->declare_parameter("segment_image_height", 480);
 
     this->get_parameter("input_segment_topic", input_segment_topic_);
     this->get_parameter("output_bbx3d_topic", output_bbx3d_topic_);
@@ -73,19 +82,26 @@ void SegmentationProcessor::initParams() {
     this->get_parameter("working_frame", working_frame_);
     this->get_parameter("mininum_detection_threshold", mininum_detection_threshold_);
     this->get_parameter("minimum_probability", minimum_probability_);
+    this->get_parameter("min_valid_points_tire", min_valid_points_tire_);
+    this->get_parameter("tire_cluster_tolerance", tire_cluster_tolerance_);
+    this->get_parameter("tire_max_distance_m", tire_max_distance_m_);
     this->get_parameter("interested_classes", interested_classes_);
     this->get_parameter("min_valid_points", min_valid_points_);
     this->get_parameter("tf_max_age_ms", tf_max_age_ms_);
+    this->get_parameter("segment_image_width", segment_image_width_);
+    this->get_parameter("segment_image_height", segment_image_height_);
     last_tf_warn_time_ = rclcpp::Time(0);
 
-    RCLCPP_WARN(this->get_logger(), "Parameters initialized (interested_classes: %zu, min_valid_points: %d, tf_max_age_ms: %d)", interested_classes_.size(), min_valid_points_, tf_max_age_ms_);
+    RCLCPP_WARN(this->get_logger(),
+        "Parameters initialized (interested_classes: %zu, min_valid_points: %d, min_valid_points_tire: %d, segment_image: %dx%d)",
+        interested_classes_.size(), min_valid_points_, min_valid_points_tire_, segment_image_width_, segment_image_height_);
 }
 
 void SegmentationProcessor::segmentationCallback(const segmentation_msgs::msg::ObjectsSegment::SharedPtr msg) {
     rclcpp::Time segment_stamp = msg->header.stamp;
 
 
-    RCLCPP_WARN(this->get_logger(), "Segmentation callback of segemnt");
+    RCLCPP_WARN(this->get_logger(), "Segmentation callback of segment");
     
     // Use the latest pointcloud
     if (!latest_pointcloud_) {
@@ -178,17 +194,24 @@ void SegmentationProcessor::segmentationCallback(const segmentation_msgs::msg::O
         if (object_segment.probability < minimum_probability_) continue;
         calculate_boxes(local_pointcloud, cloud_pcl, object_segment, &boxes3d_msg);
 
-        // Add points from the segment to the debug point cloud
+        // Add points from the segment to the debug point cloud (segment coords are RGB image size, e.g. 640x480; point cloud is depth size, e.g. 416x224)
+        const int pc_w = static_cast<int>(local_pointcloud.width);
+        const int pc_h = static_cast<int>(local_pointcloud.height);
         for (size_t i = 0; i < object_segment.x_indices.size(); ++i) {
-            int x = object_segment.x_indices[i];
-            int y = object_segment.y_indices[i];
+            int x_img = object_segment.x_indices[i];
+            int y_img = object_segment.y_indices[i];
+            int x = (segment_image_width_ > 0 && segment_image_height_ > 0)
+                ? static_cast<int>(static_cast<float>(x_img) * pc_w / segment_image_width_)
+                : x_img;
+            int y = (segment_image_width_ > 0 && segment_image_height_ > 0)
+                ? static_cast<int>(static_cast<float>(y_img) * pc_h / segment_image_height_)
+                : y_img;
+            if (x < 0) x = 0;
+            if (x >= pc_w) x = pc_w - 1;
+            if (y < 0) y = 0;
+            if (y >= pc_h) y = pc_h - 1;
 
-            if (x >= static_cast<int>(local_pointcloud.width) || y >= static_cast<int>(local_pointcloud.height)) {
-                RCLCPP_WARN(this->get_logger(), "Point (%d, %d) is out of bounds for the point cloud", x, y);
-                continue;
-            }
-
-            int pcl_index = (y * local_pointcloud.width) + x;
+            int pcl_index = (y * pc_w) + x;
             const pcl::PointXYZ& point = cloud_pcl->at(pcl_index);
             if (!std::isnan(point.x)) {
                 pcl::PointXYZRGB colored_point;
@@ -236,17 +259,25 @@ void SegmentationProcessor::calculate_boxes(const sensor_msgs::msg::PointCloud2&
     object_cloud->is_dense = false;
 
     // Step 2: Populate object point cloud with only valid points from the object mask
+    // Segment indices are in RGB image space (e.g. 640x480); scale to point cloud (e.g. 416x224)
+    const int pc_w = static_cast<int>(cloud_pc2.width);
+    const int pc_h = static_cast<int>(cloud_pc2.height);
     int valid_points = 0;
     for (size_t i = 0; i < object_segment.x_indices.size(); ++i) {
-        int x = object_segment.x_indices[i];
-        int y = object_segment.y_indices[i];
+        int x_img = object_segment.x_indices[i];
+        int y_img = object_segment.y_indices[i];
+        int x = (segment_image_width_ > 0 && segment_image_height_ > 0)
+            ? static_cast<int>(static_cast<float>(x_img) * pc_w / segment_image_width_)
+            : x_img;
+        int y = (segment_image_width_ > 0 && segment_image_height_ > 0)
+            ? static_cast<int>(static_cast<float>(y_img) * pc_h / segment_image_height_)
+            : y_img;
+        if (x < 0) x = 0;
+        if (x >= pc_w) x = pc_w - 1;
+        if (y < 0) y = 0;
+        if (y >= pc_h) y = pc_h - 1;
 
-        if (x >= static_cast<int>(cloud_pc2.width) || y >= static_cast<int>(cloud_pc2.height)) {
-            RCLCPP_WARN(this->get_logger(), "Point (%d, %d) is out of bounds for the point cloud", x, y);
-            continue;
-        }
-
-        int pcl_index = (y * cloud_pc2.width) + x;
+        int pcl_index = (y * pc_w) + x;
         const pcl::PointXYZ& point = cloud_pcl->at(pcl_index);
 
         if (std::isnan(point.x) || std::isnan(point.y) || std::isnan(point.z)) {
@@ -261,9 +292,15 @@ void SegmentationProcessor::calculate_boxes(const sensor_msgs::msg::PointCloud2&
         valid_points++;
     }
 
-    if (valid_points == 0 || valid_points < min_valid_points_) {
+    int required_points = min_valid_points_;
+    std::string class_lower = object_segment.class_name;
+    std::transform(class_lower.begin(), class_lower.end(), class_lower.begin(), ::tolower);
+    if (class_lower == "car-tire" || class_lower == "tire") {
+        required_points = min_valid_points_tire_;
+    }
+    if (valid_points == 0 || valid_points < required_points) {
         RCLCPP_WARN(this->get_logger(), "Insufficient valid points for object %s: %d (min %d)",
-            object_segment.class_name.c_str(), valid_points, min_valid_points_);
+            object_segment.class_name.c_str(), valid_points, required_points);
         return;
     }
 
@@ -287,8 +324,12 @@ void SegmentationProcessor::calculate_boxes(const sensor_msgs::msg::PointCloud2&
 
     // Step 5: Cluster the segmented cloud
     pcl::PointCloud<pcl::PointXYZ>::Ptr best_cluster(new pcl::PointCloud<pcl::PointXYZ>);
-    double cluster_tolerance = 0.1;  // Set clustering tolerance
+    double cluster_tolerance = 0.1;  // default clustering tolerance
     int min_cluster_size = std::min(50, static_cast<int>(segmented_cloud->points.size() / 10));  // Adaptive min cluster size
+    if (class_lower == "car-tire" || class_lower == "tire") {
+        cluster_tolerance = tire_cluster_tolerance_;
+        min_cluster_size = std::max(min_valid_points_tire_, std::min(20, static_cast<int>(segmented_cloud->points.size() / 12)));
+    }
     int max_cluster_size = 40000;
     if (!cluster_cloud(segmented_cloud, best_cluster, cluster_tolerance, min_cluster_size, max_cluster_size)) {
         RCLCPP_WARN(this->get_logger(), "Failed to cluster point cloud for object: %s (segmented cloud had %zu points)", 
@@ -321,6 +362,15 @@ void SegmentationProcessor::calculate_boxes(const sensor_msgs::msg::PointCloud2&
         miny = std::min(point.y, miny);
         minz = std::min(point.z, minz);
     }
+    if (class_lower == "car-tire" || class_lower == "tire") {
+        float max_range = tire_max_distance_m_;
+        float max_xy = std::max(std::max(std::abs(maxx), std::abs(minx)), std::max(std::abs(maxy), std::abs(miny)));
+        if (max_xy > max_range) {
+            RCLCPP_WARN(this->get_logger(), "Tire box exceeds max distance %.1fm (max_xy=%.2f), skipping",
+                max_range, max_xy);
+            return;
+        }
+    }
 
     // Step 7: Create and store the bounding box message
     gb_visual_detection_3d_msgs::msg::BoundingBox3d bbx_msg;
@@ -346,17 +396,32 @@ pcl::PointXYZRGB SegmentationProcessor::compute_center_point(const sensor_msgs::
         return pcl::PointXYZRGB();
     }
 
-    int center_x = std::accumulate(object_segment.x_indices.begin(), object_segment.x_indices.end(), 0) / object_segment.x_indices.size();
-    int center_y = std::accumulate(object_segment.y_indices.begin(), object_segment.y_indices.end(), 0) / object_segment.y_indices.size();
+    const int pc_w = static_cast<int>(cloud_pc2.width);
+    const int pc_h = static_cast<int>(cloud_pc2.height);
+    const float scale_x = (segment_image_width_ > 0) ? static_cast<float>(pc_w) / segment_image_width_ : 1.0f;
+    const float scale_y = (segment_image_height_ > 0) ? static_cast<float>(pc_h) / segment_image_height_ : 1.0f;
+
+    int center_x_img = std::accumulate(object_segment.x_indices.begin(), object_segment.x_indices.end(), 0) / object_segment.x_indices.size();
+    int center_y_img = std::accumulate(object_segment.y_indices.begin(), object_segment.y_indices.end(), 0) / object_segment.y_indices.size();
+    int center_x = static_cast<int>(center_x_img * scale_x);
+    int center_y = static_cast<int>(center_y_img * scale_y);
+    if (center_x < 0) center_x = 0;
+    if (center_x >= pc_w) center_x = pc_w - 1;
+    if (center_y < 0) center_y = 0;
+    if (center_y >= pc_h) center_y = pc_h - 1;
     std::vector<int> xs = object_segment.x_indices;
     std::vector<int> ys = object_segment.y_indices;
     std::sort(xs.begin(), xs.end());
     std::sort(ys.begin(), ys.end());
 
-    int min_x = xs.front();
-    int max_x = xs.back();
-    int min_y = ys.front();
-    int max_y = ys.back();
+    int min_x = static_cast<int>(xs.front() * scale_x);
+    int max_x = static_cast<int>(xs.back() * scale_x);
+    int min_y = static_cast<int>(ys.front() * scale_y);
+    int max_y = static_cast<int>(ys.back() * scale_y);
+    if (min_x < 0) min_x = 0;
+    if (max_x >= pc_w) max_x = pc_w - 1;
+    if (min_y < 0) min_y = 0;
+    if (max_y >= pc_h) max_y = pc_h - 1;
 
     int width = max_x - min_x;
     int height = max_y - min_y;

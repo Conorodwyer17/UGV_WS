@@ -4,13 +4,22 @@
 import os
 import sys
 
-from ament_index_python.packages import get_package_prefix, get_package_share_directory
+from ament_index_python.packages import (
+    get_package_prefix,
+    get_package_share_directory,
+)
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, ExecuteProcess, GroupAction, SetEnvironmentVariable, TimerAction
-from launch.substitutions import LaunchConfiguration
+from launch.actions import (
+    DeclareLaunchArgument,
+    ExecuteProcess,
+    GroupAction,
+    IncludeLaunchDescription,
+    SetEnvironmentVariable,
+    TimerAction,
+)
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.actions import IncludeLaunchDescription
-from launch_ros.actions import SetRemap, Node
+from launch_ros.actions import Node, SetRemap
+
 
 def generate_launch_description():
     # Force Fast DDS to use UDP only (avoids SHM port conflicts when multiple ROS processes run).
@@ -21,9 +30,6 @@ def generate_launch_description():
     bringup_dir = get_package_share_directory('nav2_bringup')
     ugv_nav_dir = get_package_share_directory('ugv_nav')
     launch_dir = os.path.join(bringup_dir, 'launch')
-
-    use_rviz = LaunchConfiguration('use_rviz', default='false')
-    aurora_ip = LaunchConfiguration('aurora_ip', default='192.168.11.1')
 
     params_file = os.path.join(ugv_nav_dir, 'param', 'nav_aurora.yaml')
 
@@ -40,7 +46,8 @@ def generate_launch_description():
                 launch_arguments={
                     'namespace': '',
                     'use_sim_time': 'false',
-                    'autostart': 'false',  # Manual lifecycle script; composition needs a container we don't provide
+                    # Manual lifecycle script; composition needs a container we don't provide
+                    'autostart': 'false',
                     'params_file': params_file,
                     'use_composition': 'False',
                     'use_respawn': 'False',
@@ -50,20 +57,39 @@ def generate_launch_description():
         ]
     )
 
-    # TF: Nav2 uses global_frame "map"; Aurora SDK uses "slamware_map". Publish map->slamware_map (identity)
-    # so the map frame exists. Aurora must be running (slamware_map->odom->base_link).
+    # TF: Nav2 uses global_frame "map"; Aurora SDK uses "slamware_map".
+    # Publish map->slamware_map (identity) so map frame exists.
+    # Aurora must be running (slamware_map->odom->base_link).
     map_to_slamware_tf = Node(
         package='tf2_ros',
         executable='static_transform_publisher',
         name='map_to_slamware_map',
-        arguments=['--x', '0', '--y', '0', '--z', '0', '--yaw', '0', '--pitch', '0', '--roll', '0', '--frame-id', 'map', '--child-frame-id', 'slamware_map'],
+        arguments=[
+            '--x', '0',
+            '--y', '0',
+            '--z', '0',
+            '--yaw', '0',
+            '--pitch', '0',
+            '--roll', '0',
+            '--frame-id', 'map',
+            '--child-frame-id', 'slamware_map',
+        ],
     )
     # Nav2 expects base_footprint; Aurora/URDF use base_link.
     base_footprint_tf = Node(
         package='tf2_ros',
         executable='static_transform_publisher',
         name='base_link_to_base_footprint',
-        arguments=['--x', '0', '--y', '0', '--z', '0', '--yaw', '0', '--pitch', '0', '--roll', '0', '--frame-id', 'base_link', '--child-frame-id', 'base_footprint'],
+        arguments=[
+            '--x', '0',
+            '--y', '0',
+            '--z', '0',
+            '--yaw', '0',
+            '--pitch', '0',
+            '--roll', '0',
+            '--frame-id', 'base_link',
+            '--child-frame-id', 'base_footprint',
+        ],
     )
 
     # Delay Nav2 bringup so TF and services are ready (Aurora must publish map, odom, scan first).
@@ -82,8 +108,20 @@ def generate_launch_description():
 
     ld = LaunchDescription()
     ld.add_action(set_fastdds_udp)
-    ld.add_action(DeclareLaunchArgument('use_rviz', default_value='false', description='Launch RViz'))
-    ld.add_action(DeclareLaunchArgument('aurora_ip', default_value='192.168.11.1', description='Aurora IP (for reference)'))
+    ld.add_action(
+        DeclareLaunchArgument(
+            'use_rviz',
+            default_value='false',
+            description='Launch RViz',
+        )
+    )
+    ld.add_action(
+        DeclareLaunchArgument(
+            'aurora_ip',
+            default_value='192.168.11.1',
+            description='Aurora IP (for reference)',
+        )
+    )
     # Depth gate: forwards cmd_vel_nav -> cmd_vel when /stereo/navigation_permitted True
     depth_gate = ExecuteProcess(
         cmd=[sys.executable, depth_gate_script],

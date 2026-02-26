@@ -3,15 +3,18 @@ from typing import Optional, Dict, Any
 
 import rclpy
 import tf2_geometry_msgs
-from geometry_msgs.msg import PoseStamped, Header
+from geometry_msgs.msg import PoseStamped
+from std_msgs.msg import Header
 from tf2_ros import TransformException
 
-from .geometry_utils import quaternion_from_yaw
+from .geometry_utils import quaternion_from_yaw, yaw_from_quaternion
 
 
 def compute_box_goal(node, box, offset: float) -> Optional[Dict[str, Any]]:
     """Compute a navigation goal for a detected box. Returns goal + metadata or None on failure."""
     world_frame = node.get_parameter("world_frame").value
+    map_frame = node.get_parameter("map_frame").value
+    require_tf = bool(node.get_parameter("require_goal_transform").value)
 
     center_x = (box.xmin + box.xmax) / 2.0
     center_y = (box.ymin + box.ymax) / 2.0
@@ -30,7 +33,8 @@ def compute_box_goal(node, box, offset: float) -> Optional[Dict[str, Any]]:
     dist = math.sqrt(dx * dx + dy * dy)
 
     if dist < 0.01:
-        heading = math.atan2(center_y, center_x)
+        # If we're essentially at the object center, keep current heading.
+        heading = yaw_from_quaternion(robot_pose.pose.orientation)
     else:
         heading = math.atan2(dy, dx)
 
@@ -50,14 +54,16 @@ def compute_box_goal(node, box, offset: float) -> Optional[Dict[str, Any]]:
     transform_ok = True
     try:
         transform = node.tf_buffer.lookup_transform(
-            "map", world_frame, rclpy.time.Time(), timeout=rclpy.duration.Duration(seconds=2.0)
+            map_frame, world_frame, rclpy.time.Time(), timeout=rclpy.duration.Duration(seconds=2.0)
         )
         goal = tf2_geometry_msgs.do_transform_pose_stamped(goal_slamware, transform)
     except (TransformException, Exception):
         transform_ok = False
+        if require_tf:
+            return None
         goal = PoseStamped()
         goal.header = Header()
-        goal.header.frame_id = "map"
+        goal.header.frame_id = map_frame
         goal.header.stamp = node.get_clock().now().to_msg()
         goal.pose.position.x = goal_x
         goal.pose.position.y = goal_y

@@ -1,5 +1,5 @@
 # Aurora firmware 2.11 depth camera intrinsics (224x416)
-# depth_image_raw: 224 height, 416 width, 32FC1, camera_depth_optical_frame
+# For /slamware_ros_sdk_server_node/depth_image_raw: 224 height, 416 width, 32FC1, camera_depth_optical_frame
 # Intrinsics are configurable; run depth validation to refine.
 # For ~120° FOV: fx ≈ width/(2*tan(60°)) ≈ 120; using 180 as initial estimate.
 aurora_depth_camera_info:

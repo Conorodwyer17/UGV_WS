@@ -28,8 +28,14 @@ def generate_launch_description():
         default_value='/slamware_ros_sdk_server_node/left_image_raw',
         description='Camera RGB image topic',
     )
+    fallback_vehicle_boxes_arg = DeclareLaunchArgument(
+        'fallback_vehicle_boxes_topic',
+        default_value='/darknet_ros_3d/bounding_boxes',
+        description='If semantic_labels not received after 10s, use vehicle boxes from this topic (YOLO 3D). Empty to disable.',
+    )
 
-    # Semantic fusion for vehicle detection (Aurora 2.11) — same intrinsics as depth pipeline
+    # Semantic fusion for vehicle detection (Aurora 2.11) — same intrinsics as depth pipeline.
+    # When Aurora does not publish semantic_labels, fallback to YOLO 3D boxes from segmentation_processor.
     aurora_semantic_fusion_node = Node(
         package='segmentation_3d',
         executable='aurora_semantic_fusion_node',
@@ -40,6 +46,9 @@ def generate_launch_description():
             'depth_topic': '/slamware_ros_sdk_server_node/depth_image_raw',
             'output_topic': '/aurora_semantic/vehicle_bounding_boxes',
             'intrinsics_file': intrinsics_path,
+            'fallback_vehicle_boxes_topic': LaunchConfiguration('fallback_vehicle_boxes_topic'),
+            'semantic_stale_s': 2.0,
+            'depth_stale_s': 2.0,
         }],
     )
 
@@ -112,6 +121,7 @@ def generate_launch_description():
     return LaunchDescription([
         use_bridge_arg,
         camera_rgb_topic_arg,
+        fallback_vehicle_boxes_arg,
         aurora_semantic_fusion_node,
         ultralytics_node,
         aurora_depth_camera_info_node,

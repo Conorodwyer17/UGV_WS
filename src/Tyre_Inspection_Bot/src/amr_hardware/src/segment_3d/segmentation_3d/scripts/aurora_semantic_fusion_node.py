@@ -8,6 +8,7 @@ Computes mask centroid, samples depth, projects to 3D, transforms to slamware_ma
 Publishes BoundingBoxes3d (vehicles only) for inspection_manager.
 """
 import os
+import time
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
@@ -36,6 +37,10 @@ class AuroraSemanticFusionNode(Node):
         self.declare_parameter("min_depth_m", 0.3)
         self.declare_parameter("max_depth_m", 15.0)
         self.declare_parameter("min_mask_area", 100)
+        self.declare_parameter("fallback_vehicle_boxes_topic", "")  # When set, use YOLO 3D boxes if semantic not received (e.g. /darknet_ros_3d/bounding_boxes)
+        self.declare_parameter("fallback_vehicle_labels", "car,truck,bus,motorcycle,bicycle")  # Comma-separated names to pass through
+        self.declare_parameter("semantic_stale_s", 2.0)  # seconds without semantic before treating as stale
+        self.declare_parameter("depth_stale_s", 2.0)  # seconds without depth before treating as stale
         self.declare_parameter("intrinsics_file", "")  # Load from aurora_depth_intrinsics.yaml when set
         self.declare_parameter("fx", 180.0)
         self.declare_parameter("fy", 180.0)
@@ -67,6 +72,12 @@ class AuroraSemanticFusionNode(Node):
         self.min_depth = self.get_parameter("min_depth_m").value
         self.max_depth = self.get_parameter("max_depth_m").value
         self.min_mask_area = self.get_parameter("min_mask_area").value
+        self.semantic_stale_s = float(self.get_parameter("semantic_stale_s").value)
+        self.depth_stale_s = float(self.get_parameter("depth_stale_s").value)
+        fallback_topic = self.get_parameter("fallback_vehicle_boxes_topic").value
+        fallback_labels_str = self.get_parameter("fallback_vehicle_labels").value
+        self._fallback_vehicle_boxes_topic = fallback_topic.strip() if isinstance(fallback_topic, str) else ""
+        self._fallback_vehicle_names = {s.strip().lower() for s in str(fallback_labels_str).split(",") if s.strip()}
         self.fx = fx
         self.fy = fy
         self.cx = cx
@@ -77,30 +88,49 @@ class AuroraSemanticFusionNode(Node):
         self._depth = None
         self._semantic_header = None
         self._depth_header = None
+        self._last_semantic_time = None
+        self._last_depth_time = None
+        self._last_semantic_stale_log_time = None
+        self._last_depth_stale_log_time = None
         self._tf_buffer = tf2_ros.Buffer()
         self._tf_listener = tf2_ros.TransformListener(self._tf_buffer, self)
 
         from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
-        qos_be = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, history=HistoryPolicy.KEEP_LAST, depth=5)
+        # Aurora SDK publishes with default QoS (RELIABLE). Use RELIABLE so we receive.
+        qos_reliable = QoSProfile(reliability=ReliabilityPolicy.RELIABLE, history=HistoryPolicy.KEEP_LAST, depth=5)
+        self._qos_best_effort = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, history=HistoryPolicy.KEEP_LAST, depth=10)
 
         self._sub_semantic = self.create_subscription(
-            Image, self.semantic_topic, self._cb_semantic, qos_be
+            Image, self.semantic_topic, self._cb_semantic, qos_reliable
         )
         self._sub_depth = self.create_subscription(
-            Image, self.depth_topic, self._cb_depth, qos_be
+            Image, self.depth_topic, self._cb_depth, qos_reliable
         )
         self._pub = self.create_publisher(BoundingBoxes3d, self.output_topic, 10)
 
         self._alignment_logged = False
+        self._semantic_received_logged = False
+        self._depth_received_logged = False
+        self._no_data_warn_time = None  # for delayed "no data received" warning
+        self._fallback_sub_created = False
+        self._semantic_absent_since = None  # time when we first had depth but no semantic
         self.get_logger().info(
             f"aurora_semantic_fusion: semantic={self.semantic_topic} + depth={self.depth_topic} -> {self.output_topic}"
         )
+        if self._fallback_vehicle_boxes_topic:
+            self.get_logger().info(
+                f"Fallback: if no semantic after 10s, will use vehicle boxes from {self._fallback_vehicle_boxes_topic} (labels: {self._fallback_vehicle_names})"
+            )
 
     def _cb_semantic(self, msg: Image):
         try:
             img = self.bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
             self._semantic = img
             self._semantic_header = msg.header
+            self._last_semantic_time = time.time()
+            if not self._semantic_received_logged:
+                self.get_logger().info(f"Receiving semantic: {msg.width}x{msg.height} encoding={msg.encoding}")
+                self._semantic_received_logged = True
         except Exception as e:
             self.get_logger().warn(f"Semantic cb: {e}")
 
@@ -113,11 +143,88 @@ class AuroraSemanticFusionNode(Node):
                 depth = depth.astype(np.float32)
             self._depth = depth
             self._depth_header = msg.header
+            self._last_depth_time = time.time()
+            if not self._depth_received_logged:
+                self.get_logger().info(f"Receiving depth: {msg.width}x{msg.height} encoding={msg.encoding}")
+                self._depth_received_logged = True
         except Exception as e:
             self.get_logger().warn(f"Depth cb: {e}")
 
+    def _cb_fallback_vehicle_boxes(self, msg: BoundingBoxes3d):
+        """Republish only vehicle-class boxes from YOLO 3D pipeline when semantic is unavailable."""
+        now = time.time()
+        if self._last_semantic_time is not None:
+            age = now - self._last_semantic_time
+            if age <= self.semantic_stale_s:
+                return  # semantic is fresh; ignore fallback to avoid duplicates
+        out = BoundingBoxes3d()
+        out.header = msg.header
+        for box in msg.bounding_boxes:
+            name = (box.object_name or "").strip().lower()
+            if name in self._fallback_vehicle_names:
+                out.bounding_boxes.append(box)
+        self._pub.publish(out)
+        if out.bounding_boxes and not getattr(self, "_fallback_publish_logged", False):
+            self.get_logger().info(
+                f"Fallback: publishing {len(out.bounding_boxes)} vehicle box(es) from {self._fallback_vehicle_boxes_topic}"
+            )
+            self._fallback_publish_logged = True
+
     def _run_fusion(self):
-        if self._semantic is None or self._depth is None:
+        # Warn once if we never receive semantic or depth (Aurora not running or wrong topics)
+        now = time.time()
+        semantic_age = None if self._last_semantic_time is None else (now - self._last_semantic_time)
+        depth_age = None if self._last_depth_time is None else (now - self._last_depth_time)
+        semantic_stale = semantic_age is None or semantic_age > self.semantic_stale_s
+        depth_stale = depth_age is None or depth_age > self.depth_stale_s
+        if semantic_stale and (self._last_semantic_stale_log_time is None or (now - self._last_semantic_stale_log_time) > 5.0):
+            semantic_age_msg = f"{semantic_age:.1f}" if semantic_age is not None else "inf"
+            self.get_logger().warn(
+                f"Semantic stale for {semantic_age_msg}s (threshold {self.semantic_stale_s}s)."
+            )
+            self._last_semantic_stale_log_time = now
+        if depth_stale and (self._last_depth_stale_log_time is None or (now - self._last_depth_stale_log_time) > 5.0):
+            depth_age_msg = f"{depth_age:.1f}" if depth_age is not None else "inf"
+            self.get_logger().warn(
+                f"Depth stale for {depth_age_msg}s (threshold {self.depth_stale_s}s)."
+            )
+            self._last_depth_stale_log_time = now
+
+        semantic_available = self._semantic is not None and not semantic_stale
+        depth_available = self._depth is not None and not depth_stale
+        if not semantic_available and depth_available:
+            if self._semantic_absent_since is None:
+                self._semantic_absent_since = now
+            # After 10s without semantic, enable fallback if configured
+            if (now - self._semantic_absent_since) >= 10.0 and self._fallback_vehicle_boxes_topic and not self._fallback_sub_created:
+                self._sub_fallback = self.create_subscription(
+                    BoundingBoxes3d,
+                    self._fallback_vehicle_boxes_topic,
+                    self._cb_fallback_vehicle_boxes,
+                    self._qos_best_effort,
+                )
+                self._fallback_sub_created = True
+                self.get_logger().warn(
+                    f"No semantic_labels after 10s. Using fallback: {self._fallback_vehicle_boxes_topic} "
+                    "(run segment_3d + ultralytics for YOLO vehicle boxes)."
+                )
+        else:
+            self._semantic_absent_since = None  # we have semantic, no fallback needed
+
+        # Only warn when we have neither semantic nor depth. If we have depth but no semantic, don't repeat every 5s.
+        if not semantic_available and not depth_available:
+            if self._no_data_warn_time is None:
+                self._no_data_warn_time = now
+            elif (now - self._no_data_warn_time) > 5.0:
+                self.get_logger().warn(
+                    "No semantic or depth received after 5s. Is Aurora (slamware_ros_sdk_server_node) running? "
+                    "Check: ros2 topic hz /slamware_ros_sdk_server_node/semantic_labels and .../depth_image_raw"
+                )
+                self._no_data_warn_time = now
+        else:
+            self._no_data_warn_time = None
+
+        if not semantic_available or not depth_available:
             return
         if self._depth_header is None:
             return
@@ -159,6 +266,7 @@ class AuroraSemanticFusionNode(Node):
         boxes = BoundingBoxes3d()
         boxes.header = self._depth_header
         boxes.header.frame_id = self.target_frame
+        had_vehicle_mask = False  # True if any label had area >= min_mask_area (for diagnostic when 0 boxes)
 
         for label_id in VEHICLE_LABEL_IDS:
             mask = (semantic_labels == label_id)
@@ -167,6 +275,7 @@ class AuroraSemanticFusionNode(Node):
             area = np.sum(mask)
             if area < self.min_mask_area:
                 continue
+            had_vehicle_mask = True
             ys, xs = np.where(mask)
             cy_px = float(np.mean(ys))
             cx_px = float(np.mean(xs))
@@ -185,16 +294,19 @@ class AuroraSemanticFusionNode(Node):
             x_cam = (cx_px - self.cx) * z / self.fx
             y_cam = (cy_px - self.cy) * z / self.fy
             z_cam = z
-            # Transform to target frame
+            # Transform to target frame (use latest TF to avoid clock sync issues with Aurora)
             try:
                 t = self._tf_buffer.lookup_transform(
                     self.target_frame,
                     self.camera_frame,
-                    self._depth_header.stamp,
-                    rclpy.duration.Duration(seconds=0.2),
+                    rclpy.time.Time(),
+                    rclpy.duration.Duration(seconds=0.5),
                 )
             except Exception as e:
-                self.get_logger().debug(f"TF lookup failed: {e}")
+                self.get_logger().warn(
+                    f"TF lookup failed ({self.target_frame} <- {self.camera_frame}): {e}",
+                    throttle_duration_sec=5.0,
+                )
                 continue
             # Apply transform (quaternion to rotation matrix)
             R = np.array([
@@ -213,7 +325,6 @@ class AuroraSemanticFusionNode(Node):
             p_map = R @ p + t_vec
             # Create minimal BoundingBox3d (center + small extent)
             box = BoundingBox3d()
-            box.header = boxes.header
             box.object_name = VEHICLE_LABEL_NAMES[label_id]
             box.probability = 0.95
             extent = 0.5
@@ -227,6 +338,19 @@ class AuroraSemanticFusionNode(Node):
 
         if boxes.bounding_boxes:
             self._pub.publish(boxes)
+            self.get_logger().info(
+                f"Publishing {len(boxes.bounding_boxes)} vehicle box(es): "
+                f"{[b.object_name for b in boxes.bounding_boxes]}",
+                throttle_duration_sec=2.0,
+            )
+        else:
+            # Publish empty so the topic exists (ros2 topic echo / list can see it)
+            self._pub.publish(boxes)
+            if had_vehicle_mask:
+                self.get_logger().warn(
+                    "Vehicle mask(s) above min_area but 0 boxes (depth invalid or TF lookup failed); check depth topic and camera_depth_optical_frame->slamware_map.",
+                    throttle_duration_sec=5.0,
+                )
 
 
 def main(args=None):

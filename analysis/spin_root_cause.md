@@ -3,13 +3,13 @@
 ## What the code commands during search
 Rotation during search is **explicitly commanded** by `_dispatch_rotation_goal`, using `rotation_angle` and a small forward offset to force Nav2 to rotate.
 
-```86:88:/home/conor/.cursor/worktrees/ugv_ws__SSH__jetson_Thesis_WIFI_/rxd/src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/inspection_manager/inspection_manager_node.py
+```50:52:src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/inspection_manager/inspection_manager_node.py
         self.declare_parameter("rotation_angle", 0.785)  # 45 degrees in radians
         self.declare_parameter("max_rotation_attempts", 8)  # 8 * 45 = 360 degrees
         self.declare_parameter("rotation_position_offset", 0.1)  # Small forward offset to force Nav2 execution
 ```
 
-```1706:1783:/home/conor/.cursor/worktrees/ugv_ws__SSH__jetson_Thesis_WIFI_/rxd/src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/inspection_manager/inspection_manager_node.py
+```1553:1636:src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/inspection_manager/inspection_manager_node.py
     def _dispatch_rotation_goal(self, is_vehicle: bool = True, is_search: bool = False):
         """Dispatch a rotation goal to turn in place by rotation_angle.
         ...
@@ -44,7 +44,6 @@ The inspection manager logs show **45° search rotations** (not 180°). Example 
 ```
 Nav2 **spin behavior actually executes** in the same window:
 ```
-23:27:/home/conor/.ros/log/behavior_server_3097_1772023011378.log
 [INFO] [1772023067.562656648] [behavior_server]: Running spin
 [INFO] [1772023067.563463304] [behavior_server]: Turning 1.57 for spin behavior.
 [WARN] [1772023069.464053736] [behavior_server]: Collision Ahead - Exiting Spin
@@ -53,8 +52,7 @@ Nav2 **spin behavior actually executes** in the same window:
 
 ## Likely causes of a 180° spin (if observed visually)
 1. **Nav2 Spin recovery**: behavior server has a Spin plugin **and it is executed** (see log above); if a goal is behind or unreachable, recovery can rotate in place.
-```
-205:208:/home/conor/.cursor/worktrees/ugv_ws__SSH__jetson_Thesis_WIFI_/rxd/analysis/journal_ugv_mission_2026-02-25_1240-1310.log
+```205:208:analysis/journal_ugv_mission_2026-02-25_1240-1310.log
 2026-02-25T13:01:25+0000 conor-desktop ugv_mission[3525]: [behavior_server-20] [INFO] [1772024485.729742776] [behavior_server]: Creating behavior plugin spin of type nav2_behaviors/Spin
 2026-02-25T13:01:25+0000 conor-desktop ugv_mission[3525]: [behavior_server-20] [INFO] [1772024485.735268666] [behavior_server]: Configuring spin
 ```

@@ -48,31 +48,35 @@ namespace slamware_ros_sdk {
         auto wkDat = mutableWorkData();
         const auto& currentPoseStamped = wkDat->robotPose;
 
-        if(!firstPoseReceived_) {
-            lastPoseStamped_ = currentPoseStamped;
+        double vx = 0.0, vy = 0.0, vth = 0.0;
+        if (!firstPoseReceived_) {
             firstPoseReceived_ = true;
-            return;
+            lastPoseStamped_ = currentPoseStamped;
+            // Publish first pose immediately so TF odom->base_link exists (mission and Nav2 require it).
+            // Use zero twist; subsequent cycles will publish velocity when dt > 0.
+        } else {
+            double dt = (rclcpp::Time(currentPoseStamped.header.stamp) -
+                         rclcpp::Time(lastPoseStamped_.header.stamp)).seconds();
+            if (dt < std::numeric_limits<double>::epsilon()) {
+                return;
+            }
+            float deltaX = currentPoseStamped.pose.position.x - lastPoseStamped_.pose.position.x;
+            float deltaY = currentPoseStamped.pose.position.y - lastPoseStamped_.pose.position.y;
+            double deltaYaw = getYawFromQuaternion(currentPoseStamped.pose.orientation) -
+                              getYawFromQuaternion(lastPoseStamped_.pose.orientation);
+            vx = deltaX / dt;
+            vy = deltaY / dt;
+            vth = deltaYaw / dt;
+            lastPoseStamped_ = currentPoseStamped;
         }
 
-        double dt = (rclcpp::Time(currentPoseStamped.header.stamp) -
-                     rclcpp::Time(lastPoseStamped_.header.stamp)).seconds();
-        if (dt < std::numeric_limits<double>::epsilon())
-            return;
-
-        float deltaX = currentPoseStamped.pose.position.x - lastPoseStamped_.pose.position.x;
-        float deltaY = currentPoseStamped.pose.position.y - lastPoseStamped_.pose.position.y;
-        double deltaYaw = getYawFromQuaternion(currentPoseStamped.pose.orientation) -
-                          getYawFromQuaternion(lastPoseStamped_.pose.orientation);
-
-        double vx = deltaX / dt;
-        double vy = deltaY / dt;
-        double vth = deltaYaw / dt;
+        // Use node clock for header so TF/odom are always current (device pose stamp can be zero or stale).
+        const rclcpp::Time nowStamp = rosSdkServer()->get_clock()->now();
 
         nav_msgs::msg::Odometry odom;
-        odom.header.stamp = currentPoseStamped.header.stamp;
+        odom.header.stamp = nowStamp;
         odom.header.frame_id = srvParams.getParameter<std::string>("odom_frame");
         odom.child_frame_id = srvParams.getParameter<std::string>("robot_frame");
-
         odom.pose.pose = currentPoseStamped.pose;
         odom.twist.twist.linear.x = vx;
         odom.twist.twist.linear.y = vy;
@@ -81,7 +85,7 @@ namespace slamware_ros_sdk {
 
         auto &tfBrdcst = tfBroadcaster();
         geometry_msgs::msg::TransformStamped odomTrans;
-        odomTrans.header.stamp = currentPoseStamped.header.stamp;
+        odomTrans.header.stamp = nowStamp;
         odomTrans.header.frame_id = srvParams.getParameter<std::string>("odom_frame");
         odomTrans.child_frame_id = srvParams.getParameter<std::string>("robot_frame");
         odomTrans.transform.translation.x = currentPoseStamped.pose.position.x;
@@ -89,8 +93,6 @@ namespace slamware_ros_sdk {
         odomTrans.transform.translation.z = currentPoseStamped.pose.position.z;
         odomTrans.transform.rotation = currentPoseStamped.pose.orientation;
         tfBrdcst->sendTransform(odomTrans);
-
-        lastPoseStamped_ = currentPoseStamped;
     }
 
     //////////////////////////////////////////////////////////////////////////
@@ -125,21 +127,11 @@ namespace slamware_ros_sdk {
 
         slamtec_aurora_sdk_pose_se3_t pose;
         uint64_t pose_timestamp;
-        if(auroraSDK->dataProvider.getCurrentPoseSE3WithTimestamp(pose,pose_timestamp))
-        {
-            if(pose_timestamp>lastTimestamp_)
-            {
-                lastTimestamp_ = pose_timestamp;
-            }
-            else
-            {
-                return;
-            }
-        }
-        else
-        {
+        if (!auroraSDK->dataProvider.getCurrentPoseSE3WithTimestamp(pose, pose_timestamp))
             return;
-        }
+        if (pose_timestamp < lastTimestamp_)
+            return;
+        lastTimestamp_ = pose_timestamp;
         wkDat->robotPose.header.stamp = rclcpp::Clock().now();
         wkDat->robotPose.pose.position.x = pose.translation.x;
         wkDat->robotPose.pose.position.y = pose.translation.y;

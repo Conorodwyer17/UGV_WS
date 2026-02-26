@@ -59,7 +59,12 @@ private:
     std::vector<std::string> interested_classes_;
     float mininum_detection_threshold_, minimum_probability_;
     int min_valid_points_;
+    int min_valid_points_tire_;
     int tf_max_age_ms_;
+    float tire_cluster_tolerance_;
+    float tire_max_distance_m_;
+    int segment_image_width_;   // RGB image size (e.g. 640 for Aurora left_image_raw)
+    int segment_image_height_;  // e.g. 480; segment indices are in this space, point cloud may be 416x224
     rclcpp::Time last_tf_warn_time_;
     visualization_msgs::msg::MarkerArray center_markers_;
 };

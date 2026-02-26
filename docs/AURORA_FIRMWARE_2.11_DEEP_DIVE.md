@@ -31,9 +31,9 @@ The `slamware_ros_sdk_server_node` uses these **workers** (from `slamware_ros_sd
 | ServerImuRawDataWorker | `/slamware_ros_sdk_server_node/imu_raw_data` | Always | IMU data |
 | RosConnectWorker | `/slamware_ros_sdk_server_node/state` | Always | Connection state |
 | ServerSystemStatusWorker | `/slamware_ros_sdk_server_node/system_status` | Always | System status |
-| ServerStereoImageWorker | `left_image_raw`, `right_image_raw`, `stereo_keypoints` | raw_image_on=true | Stereo images |
+| ServerStereoImageWorker | `/slamware_ros_sdk_server_node/left_image_raw`, `/slamware_ros_sdk_server_node/right_image_raw`, `/slamware_ros_sdk_server_node/stereo_keypoints` | raw_image_on=true | Stereo images |
 | **ServerStereoCameraInfoWorker** | `/camera/left/camera_info`, `/camera/right/camera_info` | **stereo_camera_info_enable=true** | Factory camera calibration |
-| **ServerEnhancedImagingWorker** | `depth_image_raw`, `depth_image_colorized`, `semantic_segmentation` | **Device capability** | Depth & semantic |
+| **ServerEnhancedImagingWorker** | `/slamware_ros_sdk_server_node/depth_image_raw`, `/slamware_ros_sdk_server_node/depth_image_colorized`, `/slamware_ros_sdk_server_node/semantic_segmentation` | **Device capability** | Depth & semantic |
 | ServerPointCloudWorker | `/slamware_ros_sdk_server_node/point_cloud` | Always | SLAM map points (slamware_map frame) |
 
 ---
@@ -129,10 +129,10 @@ Report is written to `logs/aurora_integration/aurora_firmware_audit_YYYYMMDD_HHM
 
 When the slamware_ros_sdk_server_node starts, it logs:
 
-- `"Depth camera supported"` → depth_image_raw will publish
-- `"Depth camera not supported"` → depth_image_raw will NOT publish
-- `"Semantic segmentation supported"` → semantic_segmentation will publish
-- `"Semantic segmentation not supported"` → semantic_segmentation will NOT publish
+- `"Depth camera supported"` → `/slamware_ros_sdk_server_node/depth_image_raw` will publish
+- `"Depth camera not supported"` → `/slamware_ros_sdk_server_node/depth_image_raw` will NOT publish
+- `"Semantic segmentation supported"` → `/slamware_ros_sdk_server_node/semantic_segmentation` will publish
+- `"Semantic segmentation not supported"` → `/slamware_ros_sdk_server_node/semantic_segmentation` will NOT publish
 - `"Label ID: X, Name: ..."` → Semantic labels (if semantic supported)
 - `"Failed to get camera calibration: error -7"` → stereo_camera_info not available
 
@@ -162,7 +162,7 @@ The slamware `point_cloud` is **not** pixel-aligned with the camera. For tire de
 
 ## 11. Next Steps After Audit
 
-1. **If depth_image_raw is published** — Use Aurora native depth (`use_bridge:=false`). Configure `depth_to_registered_pointcloud` to use `/slamware_ros_sdk_server_node/depth_image_raw`.
-2. **If semantic_segmentation is published** — Check label IDs/names; consider using Aurora semantic instead of or alongside YOLO for car/tire detection.
+1. **If `/slamware_ros_sdk_server_node/depth_image_raw` is published** — Use Aurora native depth (`use_bridge:=false`). Configure `depth_to_registered_pointcloud` with `depth_topic:=/slamware_ros_sdk_server_node/depth_image_raw`.
+2. **If `/slamware_ros_sdk_server_node/semantic_segmentation` is published** — Check label IDs/names; consider using Aurora semantic instead of or alongside YOLO for car/tire detection.
 3. **If camera_info is published** — Enable `stereo_camera_info_enable` in launch; no need for aurora_camera_info_node placeholder.
 4. **If depth still not published** — Stay on bridge path with calibration; firmware did not enable depth for your hardware variant.

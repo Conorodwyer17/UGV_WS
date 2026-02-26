@@ -1,0 +1,47 @@
+[0.828s] WARNING:colcon.colcon_ros.prefix_path.ament:The path '/home/conor/ugv_ws/install/ugv_vision' in the environment variable AMENT_PREFIX_PATH doesn't exist
+[0.828s] WARNING:colcon.colcon_ros.prefix_path.ament:The path '/home/conor/ugv_ws/install/ugv_nav' in the environment variable AMENT_PREFIX_PATH doesn't exist
+[0.829s] WARNING:colcon.colcon_ros.prefix_path.ament:The path '/home/conor/ugv_ws/install/ugv_description' in the environment variable AMENT_PREFIX_PATH doesn't exist
+[0.829s] WARNING:colcon.colcon_ros.prefix_path.ament:The path '/home/conor/ugv_ws/install/ugv_base_driver' in the environment variable AMENT_PREFIX_PATH doesn't exist
+[0.829s] WARNING:colcon.colcon_ros.prefix_path.ament:The path '/home/conor/ugv_ws/install/aurora_interface' in the environment variable AMENT_PREFIX_PATH doesn't exist
+[0.829s] WARNING:colcon.colcon_ros.prefix_path.ament:The path '/home/conor/ugv_ws/install/slamware_ros_sdk' in the environment variable AMENT_PREFIX_PATH doesn't exist
+[0.829s] WARNING:colcon.colcon_ros.prefix_path.ament:The path '/home/conor/ugv_ws/install/segmentation_3d' in the environment variable AMENT_PREFIX_PATH doesn't exist
+[0.829s] WARNING:colcon.colcon_ros.prefix_path.ament:The path '/home/conor/ugv_ws/install/segmentation_msgs' in the environment variable AMENT_PREFIX_PATH doesn't exist
+[0.829s] WARNING:colcon.colcon_ros.prefix_path.ament:The path '/home/conor/ugv_ws/install/inspection_manager' in the environment variable AMENT_PREFIX_PATH doesn't exist
+[0.829s] WARNING:colcon.colcon_ros.prefix_path.ament:The path '/home/conor/ugv_ws/install/gb_visual_detection_3d_msgs' in the environment variable AMENT_PREFIX_PATH doesn't exist
+[0.829s] WARNING:colcon.colcon_ros.prefix_path.ament:The path '/home/conor/ugv_ws/install/aurora_sdk_bridge' in the environment variable AMENT_PREFIX_PATH doesn't exist
+[0.830s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/home/conor/ugv_ws/install/ugv_nav' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+[0.830s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/home/conor/ugv_ws/install/ugv_description' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+[0.830s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/home/conor/ugv_ws/install/aurora_interface' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+[0.830s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/home/conor/ugv_ws/install/slamware_ros_sdk' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+[0.830s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/home/conor/ugv_ws/install/segmentation_3d' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+[0.830s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/home/conor/ugv_ws/install/segmentation_msgs' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+[0.830s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/home/conor/ugv_ws/install/gb_visual_detection_3d_msgs' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+[0.830s] WARNING:colcon.colcon_ros.prefix_path.catkin:The path '/home/conor/ugv_ws/install/aurora_sdk_bridge' in the environment variable CMAKE_PREFIX_PATH doesn't exist
+Starting >>> gb_visual_detection_3d_msgs
+Starting >>> slamware_ros_sdk
+Starting >>> aurora_sdk_bridge
+Starting >>> segmentation_msgs
+Starting >>> ugv_base_driver
+Starting >>> ugv_description
+--- stderr: ugv_description
+CMake Error at ament_cmake_symlink_install/ament_cmake_symlink_install.cmake:100 (message):
+  ament_cmake_symlink_install_directory() can't find
+  '/home/conor/ugv_ws/src/Tyre_Inspection_Bot/src/amr_hardware/src/ugv_description/launch'
+Call Stack (most recent call first):
+  ament_cmake_symlink_install/ament_cmake_symlink_install.cmake:314 (ament_cmake_symlink_install_directory)
+  cmake_install.cmake:46 (include)
+
+
+---
+Failed   <<< ugv_description [5.71s, exited with code 1]
+Aborted  <<< aurora_sdk_bridge [6.01s]
+Aborted  <<< ugv_base_driver [7.02s]
+Aborted  <<< gb_visual_detection_3d_msgs [8.58s]
+Aborted  <<< segmentation_msgs [8.59s]
+Aborted  <<< slamware_ros_sdk [11.7s]
+
+Summary: 0 packages finished [12.5s]
+  1 package failed: ugv_description
+  5 packages aborted: aurora_sdk_bridge gb_visual_detection_3d_msgs segmentation_msgs slamware_ros_sdk ugv_base_driver
+  1 package had stderr output: ugv_description
+  5 packages not processed

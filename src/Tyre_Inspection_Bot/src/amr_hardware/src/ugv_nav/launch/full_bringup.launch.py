@@ -2,13 +2,20 @@
 # Starts everything in order with delays so dependencies are up before clients.
 # Inspection manager is delayed until after Nav2 lifecycle (120s in nav_aurora) so the
 # NavigateToPose action server is available when the mission tries to rotate/drive.
-# Usage: ros2 launch ugv_nav full_bringup.launch.py [ip_address:=192.168.11.1] [config_file:=...] [use_motor_driver:=true] [uart_port:=/dev/ttyTHS1]
+# Usage: ros2 launch ugv_nav full_bringup.launch.py
+#   [ip_address:=192.168.11.1] [config_file:=...]
+#   [use_motor_driver:=true] [uart_port:=/dev/ttyTHS1]
 
 import os
-import sys
 from ament_index_python.packages import get_package_prefix, get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription, TimerAction
+from launch.actions import (
+    DeclareLaunchArgument,
+    ExecuteProcess,
+    IncludeLaunchDescription,
+    SetEnvironmentVariable,
+    TimerAction,
+)
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
@@ -32,7 +39,10 @@ def generate_launch_description():
     config_file_arg = DeclareLaunchArgument(
         "config_file",
         default_value="",
-        description="Path to PRODUCTION_CONFIG.yaml. If empty, uses workspace PRODUCTION_CONFIG.yaml when present.",
+        description=(
+            "Path to PRODUCTION_CONFIG.yaml. If empty, uses workspace "
+            "PRODUCTION_CONFIG.yaml when present."
+        ),
     )
     dry_run_arg = DeclareLaunchArgument(
         "dry_run",
@@ -50,7 +60,8 @@ def generate_launch_description():
         description="UART port for motor driver (e.g. /dev/ttyTHS1 on Jetson)",
     )
 
-    # 0) Motor driver — subscribes to cmd_vel, forwards to ESP32 (use_motor_driver:=false if no hardware)
+    # 0) Motor driver — subscribes to cmd_vel, forwards to ESP32
+    # (use_motor_driver:=false if no hardware)
     motor_driver_script = os.path.join(
         get_package_prefix("ugv_base_driver"), "lib", "ugv_base_driver", "motor_driver_node"
     )
@@ -87,8 +98,10 @@ def generate_launch_description():
     )
     nav_aurora_delayed = TimerAction(period=10.0, actions=[nav_aurora_launch])
 
-    # 4) Inspection manager + photo capture — after Nav2 lifecycle (Nav2 at 25s, lifecycle at 45s,
-    #    NavigateToPose ready ~55s; inspection at 55s)
+    # 4) Inspection manager + photo capture — after Nav2 lifecycle
+    # Nav2 nodes at 25s, nav_lifecycle_startup at 45s. Bringup can take 60s (TF
+    # wait) + 30–60s (configure/activate). Inspection at 120s so Nav2 is almost
+    # always ready; manager still waits for navigate_to_pose (nav2_wait_timeout).
     inspection_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(inspection_share, "launch", "inspection_manager.launch.py")
@@ -98,9 +111,14 @@ def generate_launch_description():
             "dry_run": LaunchConfiguration("dry_run"),
         }.items(),
     )
-    inspection_delayed = TimerAction(period=55.0, actions=[inspection_launch])
+    inspection_delayed = TimerAction(period=120.0, actions=[inspection_launch])
+
+    # All nodes must use same RMW so TF, topics, and mission see each other.
+    # startup.sh also sets this.
+    set_rmw = SetEnvironmentVariable(name="RMW_IMPLEMENTATION", value="rmw_cyclonedds_cpp")
 
     return LaunchDescription([
+        set_rmw,
         ip_address_arg,
         use_bridge_arg,
         config_file_arg,

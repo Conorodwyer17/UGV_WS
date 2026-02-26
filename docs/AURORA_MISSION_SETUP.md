@@ -19,10 +19,10 @@ Use **Aurora native (factory-calibrated)** outputs only. No checkerboard or fish
 ## Pipeline (no bridge by default)
 
 1. **Aurora** publishes raw depth, point cloud, scan, odom, map, images.
-2. **depth_to_registered_pointcloud** (in segment_3d launch) subscribes to `depth_image_raw` + `/camera/depth/camera_info`, publishes:
+2. **depth_to_registered_pointcloud** (in segment_3d launch) subscribes to `/slamware_ros_sdk_server_node/depth_image_raw` + `/camera/depth/camera_info`, publishes:
    - `/segmentation_processor/registered_pointcloud` (for 3D boxes)
    - `/camera/depth/points` (for Nav2 costmap)
-3. **segment_3d** uses left_image_raw + registered_pointcloud → 3D bounding boxes.
+3. **segment_3d** uses `/slamware_ros_sdk_server_node/left_image_raw` + registered_pointcloud → 3D bounding boxes.
 4. **Nav2** uses scan, odom, map, and `/camera/depth/points` for planning.
 
 ## Launch: one command (recommended)
@@ -73,7 +73,9 @@ ros2 launch inspection_manager inspection_manager.launch.py
 bash scripts/aurora_pre_mission_checklist.sh
 ```
 
-Verifies: device ping, Aurora topics (depth_image_raw, point_cloud, scan, odom, etc.), depth pipeline topics, TF slamware_map → base_link.
+Verifies: device ping, Aurora topics (`/slamware_ros_sdk_server_node/depth_image_raw`, `/slamware_ros_sdk_server_node/point_cloud`, `/slamware_ros_sdk_server_node/scan`, `/slamware_ros_sdk_server_node/odom`, etc.), depth pipeline topics, TF slamware_map → base_link.
+
+**Aurora-only TF diagnostic (run with only Aurora launch):** Ensures TF and Aurora topics are good before full stack. `aurora_bringup.launch.py` sets `RMW_IMPLEMENTATION=rmw_cyclonedds_cpp` so the launch and the diagnostic script see the same topics/TF. See `docs/AURORA_TF_AND_LAUNCH.md` and run `bash scripts/aurora_tf_diagnostic.sh` in a second terminal after starting Aurora.
 
 ## Reference
 

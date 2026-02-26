@@ -15,6 +15,7 @@
     world_frame: slamware_map
     base_frame: base_link
     map_frame: map
+    require_goal_transform: true
 
     # Topics (frozen)
     detection_topic: /darknet_ros_3d/bounding_boxes
@@ -36,7 +37,7 @@
     camera_depth_points_topic: /camera/depth/points
 
     # Detection (inspection_manager expects comma-separated string)
-    vehicle_labels: "car,truck"
+    vehicle_labels: "car,truck,bus"
     tire_label: car-tire
     min_vehicle_probability: 0.5
     min_tire_probability: 0.35
@@ -53,6 +54,10 @@
 
     # Timeouts (seconds)
     detection_timeout: 5.0
+    detection_stale_s: 2.0
+    vehicle_boxes_stale_s: 2.0
+    vehicle_search_timeout_s: 180.0
+    tire_search_timeout_s: 90.0
     tf_watchdog_timeout: 0.2
     tf_unavailable_abort_s: 60.0   # after this many seconds of continuous TF failure, transition to ERROR
     tf_wait_timeout: 60.0         # max wait for TF (slamware_map->base_link) in IDLE before starting mission
@@ -65,8 +70,21 @@
     max_state_repeats: 3
     nav_retry_budget: 3
     dispatch_fail_abort_count: 3
-    rotation_search_enabled: false
-    turn_in_place_enabled: false
+    rotation_search_enabled: true
+    turn_in_place_enabled: true
+    vehicle_patrol_interval_s: 10.0
+    patrol_step_m: 0.8
+    patrol_turn_deg: 20.0
+    patrol_pause_s: 1.0
+    patrol_max_attempts: 30
+    vehicle_confirmations_required: 3
+    tire_confirmations_required: 2
+    vehicle_confirm_tolerance_m: 1.0
+    tire_confirm_tolerance_m: 0.5
+    vehicle_min_distance_m: 0.5
+    vehicle_max_distance_m: 20.0
+    planned_tire_fallback_enabled: true
+    planned_tire_box_extent_m: 0.25
     require_nav_permitted: true
     nav_permitted_topic: /stereo/navigation_permitted
     cmd_vel_topic: /cmd_vel
@@ -91,7 +109,14 @@
     # Paths support ~ and $HOME. startup.sh creates ~/ugv_ws/logs.
     mission_log_path: "~/ugv_ws/logs/mission_latest.jsonl"
     mission_report_path: "~/ugv_ws/logs/mission_report_latest.json"
+    mission_log_fsync: true
 
     # Photo capture (photo_capture_service)
     photo_trigger_distance: 0.0  # meters; 0 disables distance gate before capture
     save_directory: "~/ugv_ws/tire_inspection_photos"
+
+    # Final face-tire alignment before capture
+    face_tire_final_yaw: true
+    face_tire_timeout_s: 20.0
+    face_tire_yaw_tolerance: 0.2
+    face_tire_yaw_speed: 0.35

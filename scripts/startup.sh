@@ -23,12 +23,15 @@ fi
 source "$INSTALL_SETUP"
 export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}"
 
+# Ensure logs dir exists for mission JSON/JSONL (offline review after WiFi reconnect)
+mkdir -p "$UGV_WS/logs"
+
 echo "=== Tire Inspection Stack (Aurora 2.11) ==="
 echo "Workspace: $UGV_WS"
 echo "RMW:       $RMW_IMPLEMENTATION"
 echo "Launch:    ugv_nav full_bringup.launch.py $*"
 echo ""
-echo "Inspection manager starts ~55s after launch. PRODUCTION_CONFIG auto-loaded."
+echo "Inspection manager starts 120s after launch; waits for Nav2 then runs full mission. PRODUCTION_CONFIG auto-loaded."
 echo ""
 
 exec ros2 launch ugv_nav full_bringup.launch.py "$@"

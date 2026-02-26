@@ -1,0 +1,29 @@
+stdin is not a terminal device. Keyboard handling disabled.[INFO] [1772051720.726411641] [rosbag2_recorder]: Press SPACE for pausing/resuming
+[INFO] [1772051720.733125890] [rosbag2_storage]: Opened database 'analysis/rosbags/acceptance_run_20260225_203520/acceptance_run_20260225_203520_0.db3' for READ_WRITE.
+[INFO] [1772051720.735503932] [rosbag2_recorder]: Listening for topics...
+[INFO] [1772051720.735601021] [rosbag2_recorder]: Event publisher thread: Starting
+[INFO] [1772051720.741619294] [rosbag2_recorder]: Subscribed to topic '/tf_static'
+[INFO] [1772051720.747352828] [rosbag2_recorder]: Subscribed to topic '/rosout'
+[INFO] [1772051720.749603829] [rosbag2_recorder]: Subscribed to topic '/parameter_events'
+[INFO] [1772051720.751483049] [rosbag2_recorder]: Subscribed to topic '/events/write_split'
+[INFO] [1772051720.754677324] [rosbag2_recorder]: Subscribed to topic '/aurora_semantic/vehicle_bounding_boxes'
+[INFO] [1772051720.754996815] [rosbag2_recorder]: Recording...
+[WARN] [1772051720.859182744] [ROSBAG2_TRANSPORT]: Hidden topics are not recorded. Enable them with --include-hidden-topics
+[INFO] [1772051720.868226202] [rosbag2_recorder]: Subscribed to topic '/slamware_ros_sdk_server_node/point_cloud'
+[INFO] [1772051720.872893677] [rosbag2_recorder]: Subscribed to topic '/slamware_ros_sdk_server_node/odom'
+[INFO] [1772051720.875889645] [rosbag2_recorder]: Subscribed to topic '/slamware_ros_sdk_server_node/left_image_raw'
+[INFO] [1772051720.879590997] [rosbag2_recorder]: Subscribed to topic '/slamware_ros_sdk_server_node/map_metadata'
+[INFO] [1772051720.883388767] [rosbag2_recorder]: Subscribed to topic '/slamware_ros_sdk_server_node/relocalization_status'
+[INFO] [1772051720.889331551] [rosbag2_recorder]: Subscribed to topic '/marker'
+[INFO] [1772051720.892250687] [rosbag2_recorder]: Subscribed to topic '/cost_cloud'
+[INFO] [1772051720.896618286] [rosbag2_recorder]: Subscribed to topic '/transformed_global_plan'
+[INFO] [1772051720.900567257] [rosbag2_recorder]: Subscribed to topic '/local_costmap/costmap'
+[INFO] [1772051720.904403522] [rosbag2_recorder]: Subscribed to topic '/cmd_vel_nav'
+[INFO] [1772051720.907502404] [rosbag2_recorder]: Subscribed to topic '/slamware_ros_sdk_server_node/imu_raw_data'
+[INFO] [1772051720.910377315] [rosbag2_recorder]: Subscribed to topic '/slamware_ros_sdk_server_node/stereo_keypoints'
+[INFO] [1772051720.915474970] [rosbag2_recorder]: Subscribed to topic '/local_costmap/costmap_updates'
+[INFO] [1772051720.921094455] [rosbag2_recorder]: Subscribed to topic '/slamware_ros_sdk_server_node/system_status'
+[INFO] [1772051720.924094808] [rosbag2_recorder]: Subscribed to topic '/slamware_ros_sdk_server_node/robot_pose'
+[INFO] [1772051720.926053709] [rosbag2_recorder]: Subscribed to topic '/slamware_ros_sdk_server_node/semantic_labels'
+terminate called after throwing an instance of 'rosbag2_storage_plugins::SqliteException'
+  what():  Error when processing SQL statement. SQLite error (1299): constraint failed

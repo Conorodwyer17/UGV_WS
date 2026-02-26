@@ -1,0 +1,43 @@
+# UGV tire inspection mission — auto-start on boot (headless)
+# Install: sudo cp scripts/ugv_mission.service /etc/systemd/system/
+#          sudo systemctl daemon-reload
+#          sudo systemctl enable ugv_mission
+# Control: sudo systemctl start|stop|restart|status ugv_mission
+# Logs:    journalctl -u ugv_mission -f
+
+[Unit]
+Description=UGV Tire Inspection Mission (Aurora 2.11)
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=conor
+Group=conor
+WorkingDirectory=/home/conor/ugv_ws
+
+# Aurora SDK shared library (required for slamware_ros_sdk_server_node)
+# Use linux_aarch64 for Jetson; linux_x86_64 for x86_64 desktop
+Environment=LD_LIBRARY_PATH=/home/conor/ugv_ws/src/aurora_ros2_sdk_linux/src/aurora_remote_public/lib/linux_aarch64
+
+# Start mission launch (skips interactive preflight for headless)
+Environment=UGV_WS=/home/conor/ugv_ws
+Environment=SKIP_PREFLIGHT=1
+Environment=RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+Environment=HOME=/home/conor
+
+# Source ROS 2 + workspace, then run mission_launch (SKIP_PREFLIGHT=1 for headless)
+# Edit User, paths if not conor /home/conor/ugv_ws
+ExecStartPre=/bin/mkdir -p /home/conor/ugv_ws/logs
+ExecStart=/bin/bash -c 'source /opt/ros/humble/setup.bash && source /home/conor/ugv_ws/install/setup.bash && export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp SKIP_PREFLIGHT=1 && exec /home/conor/ugv_ws/scripts/mission_launch.sh'
+
+# Restart policy: don't restart on failure (mission runs once)
+Restart=no
+RestartSec=10
+
+# Output to file for offline review (persists across power-off)
+StandardOutput=append:/home/conor/ugv_ws/logs/mission_service.log
+StandardError=append:/home/conor/ugv_ws/logs/mission_service.log
+
+[Install]
+WantedBy=multi-user.target

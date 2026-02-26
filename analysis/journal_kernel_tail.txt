@@ -1,0 +1,202 @@
+Aug 26 16:23:08 conor-desktop kernel: rtk_btusb: New cfg len 6
+Aug 26 16:23:08 conor-desktop kernel: rtk_btusb: 55 ab 23 87 00 00
+Aug 26 16:23:08 conor-desktop kernel: rtk_btusb: fw name is  rtl8822cu_fw
+Aug 26 16:23:08 conor-desktop kernel: tegra194-pcie 141e0000.pcie: Adding to iommu group 39
+Aug 26 16:23:08 conor-desktop kernel: rtk_btusb: This is not 8723a, use new patch style!
+Aug 26 16:23:08 conor-desktop kernel: rtk_btusb: rtk_get_eversion: gEVersion 255
+Aug 26 16:23:08 conor-desktop kernel: rtk_btusb: eversion->status = 0x0, eversion->version = 0x3
+Aug 26 16:23:08 conor-desktop kernel: rtk_btusb: load_firmware: New gEVersion 3
+Aug 26 16:23:08 conor-desktop kernel: rtk_btusb: rtk_get_fw_project_id: opcode 0, len 1, data 13
+Aug 26 16:23:08 conor-desktop kernel: rtk_btusb: lmp_version is 8822, project_id is 8822, match!
+Aug 26 16:23:08 conor-desktop kernel: rtk_btusb: fw_version = 0x9a8cbc9
+Aug 26 16:23:08 conor-desktop kernel: rtk_btusb: number_of_total_patch = 3
+Aug 26 16:23:08 conor-desktop kernel: rtk_btusb: chipID 4
+Aug 26 16:23:08 conor-desktop kernel: rtk_btusb: patch_length 0x8590
+Aug 26 16:23:08 conor-desktop kernel: rtk_btusb: start_offset 0x00005d00
+Aug 26 16:23:08 conor-desktop kernel: rtk_btusb: Svn version: 1940234490
+Aug 26 16:23:08 conor-desktop kernel: rtk_btusb: Coexistence: BTCOEX_20210106-2020
+Aug 26 16:23:08 conor-desktop kernel: rtk_btusb: buf_len = 0x8596
+Aug 26 16:23:08 conor-desktop kernel: rtk_btusb: fw: exists, config file: exists
+Aug 26 16:23:08 conor-desktop kernel: rtk_btusb: load_firmware done
+Aug 26 16:23:08 conor-desktop kernel: rtk_btusb: download_data start
+Aug 26 16:23:08 conor-desktop kernel: tegra194-pcie 141e0000.pcie: host bridge /bus@0/pcie@141e0000 ranges:
+Aug 26 16:23:08 conor-desktop kernel: tegra194-pcie 141e0000.pcie:      MEM 0x3000000000..0x3227ffffff -> 0x3000000000
+Aug 26 16:23:08 conor-desktop kernel: tegra194-pcie 141e0000.pcie:      MEM 0x3228000000..0x322fffffff -> 0x0040000000
+Aug 26 16:23:08 conor-desktop kernel: tegra194-pcie 141e0000.pcie:       IO 0x003e100000..0x003e1fffff -> 0x003e100000
+Aug 26 16:23:08 conor-desktop kernel: tegra194-pcie 141e0000.pcie: iATU unroll: enabled
+Aug 26 16:23:08 conor-desktop kernel: tegra194-pcie 141e0000.pcie: Detected iATU regions: 8 outbound, 2 inbound
+Aug 26 16:23:08 conor-desktop kernel: cdc_acm 1-2.3.2:1.0: ttyACM0: USB ACM device
+Aug 26 16:23:08 conor-desktop kernel: usbcore: registered new interface driver cdc_acm
+Aug 26 16:23:08 conor-desktop kernel: cdc_acm: USB Abstract Control Model driver for USB modems and ISDN adapters
+Aug 26 16:23:08 conor-desktop kernel: nvvrs-pseq-rtc nvvrs-pseq-rtc: registered as rtc0
+Feb 25 18:36:59 conor-desktop kernel: nvvrs-pseq-rtc nvvrs-pseq-rtc: setting system clock to 2026-02-25T18:36:59 UTC (1772044619)
+Feb 25 18:36:59 conor-desktop kernel: loop0: detected capacity change from 0 to 8
+Feb 25 18:36:59 conor-desktop kernel: loop1: detected capacity change from 0 to 141200
+Feb 25 18:36:59 conor-desktop kernel: squashfs: SQUASHFS error: Xattrs in filesystem, these will be ignored
+Feb 25 18:36:59 conor-desktop kernel: unable to read xattr id index table
+Feb 25 18:36:59 conor-desktop kernel: loop2: detected capacity change from 0 to 482776
+Feb 25 18:36:59 conor-desktop kernel: loop3: detected capacity change from 0 to 491584
+Feb 25 18:36:59 conor-desktop kernel: loop4: detected capacity change from 0 to 1030064
+Feb 25 18:36:59 conor-desktop kernel: rtk_btusb: download_data done
+Feb 25 18:36:59 conor-desktop kernel: rtk_btusb: HCI reset.
+Feb 25 18:36:59 conor-desktop kernel: loop5: detected capacity change from 0 to 85200
+Feb 25 18:36:59 conor-desktop kernel: squashfs: SQUASHFS error: Xattrs in filesystem, these will be ignored
+Feb 25 18:36:59 conor-desktop kernel: unable to read xattr id index table
+Feb 25 18:36:59 conor-desktop kernel: loop6: detected capacity change from 0 to 187776
+Feb 25 18:36:59 conor-desktop kernel: rtk_btusb: read_ver_rsp->lmp_subver = 0xcbc9
+Feb 25 18:36:59 conor-desktop kernel: rtk_btusb: read_ver_rsp->hci_rev = 0x9a8
+Feb 25 18:36:59 conor-desktop kernel: rtk_btusb: patch_entry->lmp_sub = 0x8822
+Feb 25 18:36:59 conor-desktop kernel: rtk_btusb: Rtk patch end 0
+Feb 25 18:36:59 conor-desktop kernel: rtk_btusb: btusb_open set HCI UP RUNNING
+Feb 25 18:36:59 conor-desktop kernel: rtk_btcoex: Open BTCOEX
+Feb 25 18:36:59 conor-desktop kernel: rtk_btcoex: rtk_vendor_cmd_to_fw: opcode 0xfc1b
+Feb 25 18:36:59 conor-desktop kernel: rtk_btusb: btusb_open end
+Feb 25 18:36:59 conor-desktop kernel: rtk_btcoex: unknown hci command
+Feb 25 18:36:59 conor-desktop kernel: rtk_btcoex: BTCOEX hci_rev 0x09a8
+Feb 25 18:36:59 conor-desktop kernel: rtk_btcoex: BTCOEX lmp_subver 0xcbc9
+Feb 25 18:36:59 conor-desktop kernel: rtk_btusb: btusb_notify: hci0 evt 3
+Feb 25 18:36:59 conor-desktop kernel: tegra-adma 2930000.dma-controller: Tegra210 ADMA driver registered 32 channels
+Feb 25 18:36:59 conor-desktop kernel: rtk_btusb: btusb_flush add delay 
+Feb 25 18:36:59 conor-desktop kernel: rtk_btusb: btusb_close
+Feb 25 18:36:59 conor-desktop kernel: rtk_btcoex: Close BTCOEX
+Feb 25 18:36:59 conor-desktop kernel: rtk_btcoex: -x
+Feb 25 18:36:59 conor-desktop kernel: cfg80211: Loading compiled-in X.509 certificates for regulatory database
+Feb 25 18:36:59 conor-desktop kernel: cfg80211: Loaded X.509 cert 'sforshee: 00b28ddf47aef9cea7'
+Feb 25 18:36:59 conor-desktop kernel: cfg80211: Loaded X.509 cert 'wens: 61c038651aabdcf94bd0ac7ff06c7248db18c600'
+Feb 25 18:36:59 conor-desktop kernel: tegra210-admaif 290f000.admaif: Adding to iommu group 40
+Feb 25 18:36:59 conor-desktop kernel: nvme 0004:01:00.0: Adding to iommu group 38
+Feb 25 18:36:59 conor-desktop kernel: nvme nvme0: pci function 0004:01:00.0
+Feb 25 18:36:59 conor-desktop kernel: nvme 0004:01:00.0: enabling device (0000 -> 0002)
+Feb 25 18:36:59 conor-desktop kernel: nvme nvme0: allocated 8 MiB host memory buffer.
+Feb 25 18:36:59 conor-desktop kernel: rtl88x2ce 0001:01:00.0: Adding to iommu group 36
+Feb 25 18:36:59 conor-desktop kernel: rtl88x2ce 0001:01:00.0: enabling device (0000 -> 0003)
+Feb 25 18:36:59 conor-desktop kernel: nvme nvme0: 6/0/0 default/read/poll queues
+Feb 25 18:36:59 conor-desktop kernel: nvme nvme0: Ignoring bogus Namespace Identifiers
+Feb 25 18:36:59 conor-desktop kernel:  nvme0n1: p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12 p13 p14 p15
+Feb 25 18:37:00 conor-desktop kernel: rtl88x2ce 0001:01:00.0 wlP1p1s0: renamed from wlan0
+Feb 25 18:37:00 conor-desktop kernel: tegra194-pcie 141e0000.pcie: Phy link never came up
+Feb 25 18:37:01 conor-desktop kernel: tegra194-pcie 141e0000.pcie: Phy link never came up
+Feb 25 18:37:01 conor-desktop kernel: tegra194-pcie 141e0000.pcie: PCI host bridge to bus 0007:00
+Feb 25 18:37:01 conor-desktop kernel: pci_bus 0007:00: root bus resource [io  0x200000-0x2fffff] (bus address [0x3e100000-0x3e1fffff])
+Feb 25 18:37:01 conor-desktop kernel: pci_bus 0007:00: root bus resource [mem 0x3228000000-0x322fffffff] (bus address [0x40000000-0x47ffffff])
+Feb 25 18:37:01 conor-desktop kernel: pci_bus 0007:00: root bus resource [bus 00-ff]
+Feb 25 18:37:01 conor-desktop kernel: pci_bus 0007:00: root bus resource [mem 0x3000000000-0x3227ffffff pref]
+Feb 25 18:37:01 conor-desktop kernel: pci 0007:00:00.0: [10de:229a] type 01 class 0x060400
+Feb 25 18:37:01 conor-desktop kernel: pci 0007:00:00.0: PME# supported from D0 D3hot
+Feb 25 18:37:01 conor-desktop kernel: pci 0007:00:00.0: PCI bridge to [bus 01-ff]
+Feb 25 18:37:01 conor-desktop kernel: pcieport 0007:00:00.0: Adding to iommu group 39
+Feb 25 18:37:01 conor-desktop kernel: pcieport 0007:00:00.0: PME: Signaling with IRQ 195
+Feb 25 18:37:01 conor-desktop kernel: pcieport 0007:00:00.0: AER: enabled with IRQ 195
+Feb 25 18:37:01 conor-desktop kernel: pci_bus 0007:01: busn_res: [bus 01-ff] is released
+Feb 25 18:37:01 conor-desktop kernel: pci 0007:00:00.0: Removing from iommu group 39
+Feb 25 18:37:01 conor-desktop kernel: pci_bus 0007:00: busn_res: [bus 00-ff] is released
+Feb 25 18:37:01 conor-desktop kernel: tegra194-pcie 140a0000.pcie: Adding to iommu group 41
+Feb 25 18:37:01 conor-desktop kernel: tegra194-pcie 140a0000.pcie: host bridge /bus@0/pcie@140a0000 ranges:
+Feb 25 18:37:01 conor-desktop kernel: tegra194-pcie 140a0000.pcie:      MEM 0x3240000000..0x3527ffffff -> 0x3240000000
+Feb 25 18:37:01 conor-desktop kernel: tegra194-pcie 140a0000.pcie:      MEM 0x3528000000..0x352fffffff -> 0x0040000000
+Feb 25 18:37:01 conor-desktop kernel: tegra194-pcie 140a0000.pcie:       IO 0x002a100000..0x002a1fffff -> 0x002a100000
+Feb 25 18:37:01 conor-desktop kernel: tegra194-pcie 140a0000.pcie: iATU unroll: enabled
+Feb 25 18:37:01 conor-desktop kernel: tegra194-pcie 140a0000.pcie: Detected iATU regions: 8 outbound, 2 inbound
+Feb 25 18:37:01 conor-desktop kernel: tegra194-pcie 140a0000.pcie: Link up
+Feb 25 18:37:01 conor-desktop kernel: tegra194-pcie 140a0000.pcie: Link up
+Feb 25 18:37:01 conor-desktop kernel: tegra194-pcie 140a0000.pcie: PCI host bridge to bus 0008:00
+Feb 25 18:37:01 conor-desktop kernel: pci_bus 0008:00: root bus resource [io  0x300000-0x3fffff] (bus address [0x2a100000-0x2a1fffff])
+Feb 25 18:37:01 conor-desktop kernel: pci_bus 0008:00: root bus resource [mem 0x3528000000-0x352fffffff] (bus address [0x40000000-0x47ffffff])
+Feb 25 18:37:01 conor-desktop kernel: pci_bus 0008:00: root bus resource [bus 00-ff]
+Feb 25 18:37:01 conor-desktop kernel: pci_bus 0008:00: root bus resource [mem 0x3240000000-0x3527ffffff pref]
+Feb 25 18:37:01 conor-desktop kernel: pci 0008:00:00.0: [10de:229c] type 01 class 0x060400
+Feb 25 18:37:01 conor-desktop kernel: pci 0008:00:00.0: PME# supported from D0 D3hot
+Feb 25 18:37:01 conor-desktop kernel: pci 0008:01:00.0: [10ec:8168] type 00 class 0x020000
+Feb 25 18:37:01 conor-desktop kernel: pci 0008:01:00.0: reg 0x10: [io  0x0000-0x00ff]
+Feb 25 18:37:01 conor-desktop kernel: pci 0008:01:00.0: reg 0x18: [mem 0x00000000-0x00000fff 64bit]
+Feb 25 18:37:01 conor-desktop kernel: pci 0008:01:00.0: reg 0x20: [mem 0x00000000-0x00003fff 64bit]
+Feb 25 18:37:01 conor-desktop kernel: pci 0008:01:00.0: supports D1 D2
+Feb 25 18:37:01 conor-desktop kernel: pci 0008:01:00.0: PME# supported from D0 D1 D2 D3hot D3cold
+Feb 25 18:37:01 conor-desktop kernel: pci 0008:00:00.0: BAR 14: assigned [mem 0x3528000000-0x35280fffff]
+Feb 25 18:37:01 conor-desktop kernel: pci 0008:00:00.0: BAR 13: assigned [io  0x300000-0x300fff]
+Feb 25 18:37:01 conor-desktop kernel: pci 0008:01:00.0: BAR 4: assigned [mem 0x3528000000-0x3528003fff 64bit]
+Feb 25 18:37:01 conor-desktop kernel: pci 0008:01:00.0: BAR 2: assigned [mem 0x3528004000-0x3528004fff 64bit]
+Feb 25 18:37:01 conor-desktop kernel: pci 0008:01:00.0: BAR 0: assigned [io  0x300000-0x3000ff]
+Feb 25 18:37:01 conor-desktop kernel: pci 0008:00:00.0: PCI bridge to [bus 01-ff]
+Feb 25 18:37:01 conor-desktop kernel: pci 0008:00:00.0:   bridge window [io  0x300000-0x300fff]
+Feb 25 18:37:01 conor-desktop kernel: pci 0008:00:00.0:   bridge window [mem 0x3528000000-0x35280fffff]
+Feb 25 18:37:01 conor-desktop kernel: pcieport 0008:00:00.0: Adding to iommu group 41
+Feb 25 18:37:01 conor-desktop kernel: pcieport 0008:00:00.0: PME: Signaling with IRQ 189
+Feb 25 18:37:01 conor-desktop kernel: pcieport 0008:00:00.0: AER: enabled with IRQ 189
+Feb 25 18:37:01 conor-desktop kernel: r8168 0008:01:00.0: Adding to iommu group 41
+Feb 25 18:37:01 conor-desktop kernel: r8168 Gigabit Ethernet driver 8.053.00-NAPI loaded
+Feb 25 18:37:01 conor-desktop kernel: r8168 0008:01:00.0: enabling device (0000 -> 0003)
+Feb 25 18:37:01 conor-desktop kernel: r8168: This product is covered by one or more of the following patents: US6,570,884, US6,115,776, and US6,327,625.
+Feb 25 18:37:01 conor-desktop kernel: r8168  Copyright (C) 2024 Realtek NIC software team <nicfae@realtek.com> 
+                                       This program comes with ABSOLUTELY NO WARRANTY; for details, please see <http://www.gnu.org/licenses/>. 
+                                       This is free software, and you are welcome to redistribute it under certain conditions; see <http://www.gnu.org/licenses/>. 
+Feb 25 18:37:01 conor-desktop kernel: r8168 0008:01:00.0 enP8p1s0: renamed from eth0
+Feb 25 18:37:02 conor-desktop kernel: using random self ethernet address
+Feb 25 18:37:02 conor-desktop kernel: using random host ethernet address
+Feb 25 18:37:02 conor-desktop nv_nvsciipc_init.sh[647]: found /dev/nvsciipc
+Feb 25 18:37:02 conor-desktop kernel: loop7: detected capacity change from 0 to 32768
+Feb 25 18:37:03 conor-desktop kernel: nvsciipc: set_db start
+Feb 25 18:37:03 conor-desktop kernel: nvsciipc: set_db done
+Feb 25 18:37:03 conor-desktop kernel: loop8: detected capacity change from 0 to 8
+Feb 25 18:37:03 conor-desktop kernel: Bluetooth: BNEP (Ethernet Emulation) ver 1.3
+Feb 25 18:37:03 conor-desktop kernel: Bluetooth: BNEP filters: protocol multicast
+Feb 25 18:37:03 conor-desktop kernel: Bluetooth: BNEP socket layer initialized
+Feb 25 18:37:03 conor-desktop kernel: NET: Registered PF_ALG protocol family
+Feb 25 18:37:03 conor-desktop kernel: Mass Storage Function, version: 2009/09/11
+Feb 25 18:37:03 conor-desktop kernel: LUN: removable file: (no medium)
+Feb 25 18:37:03 conor-desktop kernel: using random self ethernet address
+Feb 25 18:37:03 conor-desktop kernel: using random host ethernet address
+Feb 25 18:37:03 conor-desktop kernel: bridge: filtering via arp/ip/ip6tables is no longer available by default. Update your scripts to load br_netfilter if you need this.
+Feb 25 18:37:03 conor-desktop kernel: usb0: HOST MAC 5e:54:a3:25:fa:cc
+Feb 25 18:37:03 conor-desktop kernel: usb0: MAC 5e:54:a3:25:fa:cd
+Feb 25 18:37:03 conor-desktop kernel: usb1: HOST MAC 5e:54:a3:25:fa:ce
+Feb 25 18:37:03 conor-desktop kernel: usb1: MAC 5e:54:a3:25:fa:cf
+Feb 25 18:37:03 conor-desktop kernel: tegra-xudc 3550000.usb: EP 0 (type: ctrl, dir: out) enabled
+Feb 25 18:37:03 conor-desktop kernel: l4tbr0: port 1(usb0) entered blocking state
+Feb 25 18:37:03 conor-desktop kernel: l4tbr0: port 1(usb0) entered disabled state
+Feb 25 18:37:03 conor-desktop kernel: device usb0 entered promiscuous mode
+Feb 25 18:37:03 conor-desktop kernel: l4tbr0: port 2(usb1) entered blocking state
+Feb 25 18:37:03 conor-desktop kernel: l4tbr0: port 2(usb1) entered disabled state
+Feb 25 18:37:03 conor-desktop kernel: device usb1 entered promiscuous mode
+Feb 25 18:37:03 conor-desktop kernel: loop7: detected capacity change from 0 to 32768
+Feb 25 18:37:03 conor-desktop kernel: enP8p1s0: 0xffff800009c97000, 4c:bb:47:a6:5b:7b, IRQ 277
+Feb 25 18:37:05 conor-desktop kernel: pstore: Using crash dump compression: deflate
+Feb 25 18:37:05 conor-desktop kernel: printk: console [ramoops-1]: printing thread started
+Feb 25 18:37:05 conor-desktop kernel: printk: console [ramoops-1] enabled
+Feb 25 18:37:05 conor-desktop kernel: pstore: Registered ramoops as persistent store backend
+Feb 25 18:37:05 conor-desktop kernel: ramoops: using 0x200000@0x2725f0000, ecc: 0
+Feb 25 18:37:05 conor-desktop kernel: nvgpu: 17000000.gpu                  gk20a_scale_init:541  [INFO]  enabled scaling for GPU
+Feb 25 18:37:06 conor-desktop kernel: zram: Added device: zram0
+Feb 25 18:37:06 conor-desktop kernel: zram: Added device: zram1
+Feb 25 18:37:06 conor-desktop kernel: zram: Added device: zram2
+Feb 25 18:37:06 conor-desktop kernel: zram: Added device: zram3
+Feb 25 18:37:06 conor-desktop kernel: zram: Added device: zram4
+Feb 25 18:37:06 conor-desktop kernel: zram: Added device: zram5
+Feb 25 18:37:06 conor-desktop kernel: zram0: detected capacity change from 0 to 1300416
+Feb 25 18:37:06 conor-desktop kernel: Adding 650204k swap on /dev/zram0.  Priority:5 extents:1 across:650204k SS
+Feb 25 18:37:06 conor-desktop kernel: zram1: detected capacity change from 0 to 1300416
+Feb 25 18:37:06 conor-desktop kernel: Adding 650204k swap on /dev/zram1.  Priority:5 extents:1 across:650204k SS
+Feb 25 18:37:06 conor-desktop kernel: zram2: detected capacity change from 0 to 1300416
+Feb 25 18:37:06 conor-desktop kernel: Adding 650204k swap on /dev/zram2.  Priority:5 extents:1 across:650204k SS
+Feb 25 18:37:06 conor-desktop kernel: zram3: detected capacity change from 0 to 1300416
+Feb 25 18:37:06 conor-desktop kernel: Adding 650204k swap on /dev/zram3.  Priority:5 extents:1 across:650204k SS
+Feb 25 18:37:06 conor-desktop kernel: zram4: detected capacity change from 0 to 1300416
+Feb 25 18:37:06 conor-desktop kernel: Adding 650204k swap on /dev/zram4.  Priority:5 extents:1 across:650204k SS
+Feb 25 18:37:06 conor-desktop kernel: zram5: detected capacity change from 0 to 1300416
+Feb 25 18:37:06 conor-desktop kernel: Adding 650204k swap on /dev/zram5.  Priority:5 extents:1 across:650204k SS
+Feb 25 18:37:06 conor-desktop kernel: overlayfs: idmapped layers are currently not supported
+Feb 25 18:37:08 conor-desktop kernel: ACK 04 d4
+Feb 25 18:37:08 conor-desktop kernel: ACK 04 d4
+Feb 25 18:37:08 conor-desktop kernel: IPv6: ADDRCONF(NETDEV_CHANGE): wlP1p1s0: link becomes ready
+Feb 25 18:37:09 conor-desktop kernel: nvidia-modeset: Loading NVIDIA UNIX Open Kernel Mode Setting Driver for aarch64  540.4.0  Release Build  (buildbrain@mobile-u64-6354-d6000)  Thu Sep 18 15:33:51 PDT 2025
+Feb 25 18:37:09 conor-desktop kernel: [drm] [nvidia-drm] [GPU ID 0x00020000] Loading driver
+Feb 25 18:37:10 conor-desktop kernel: NVRM rpcRmApiControl_dce: NVRM_RPC_DCE: Failed RM ctrl call cmd:0x731341 result 0xffff:
+Feb 25 18:37:10 conor-desktop kernel: [drm] Initialized nvidia-drm 0.0.0 20160202 for 13800000.display on minor 1
+Feb 25 18:37:10 conor-desktop kernel: nv_platform 13800000.display: [drm] Cannot find any crtc or sizes
+Feb 25 18:37:16 conor-desktop kernel: rfkill: input handler disabled
+Feb 25 20:03:39 conor-desktop kernel: r8168: enP8p1s0: link up
+Feb 25 20:03:39 conor-desktop kernel: IPv6: ADDRCONF(NETDEV_CHANGE): enP8p1s0: link becomes ready
+Feb 25 20:03:42 conor-desktop kernel: r8168: enP8p1s0: link down
+Feb 25 20:03:45 conor-desktop kernel: r8168: enP8p1s0: link up
+Feb 25 20:03:48 conor-desktop kernel: r8168: enP8p1s0: link down
+Feb 25 20:03:51 conor-desktop kernel: r8168: enP8p1s0: link up

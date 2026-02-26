@@ -2,13 +2,17 @@
 
 ## Expected chain (code path)
 - `inspection_manager_node.py`: `_vehicle_boxes_cb()` → `_process_vehicle_boxes()` → `_dispatch_box_goal()` → `_send_nav_goal()` → `_on_box_result()`.
+- `goal_generator.py`: `compute_box_goal()` builds the approach pose in `slamware_map`, transforms to `map`, and returns goal metadata.
 - Vehicle detection is expected to publish semantic 3D boxes on `/aurora_semantic/vehicle_bounding_boxes`, which the inspection manager uses to compute a goal in `slamware_map` and transform to `map`.
+- If goal transforms are unavailable, dispatch fails fast (`require_goal_transform`), and patrol/rotation/planned-tire dispatches are blocked when map TF is missing.
 
 Code references:
-- `_vehicle_boxes_cb()` / `_process_vehicle_boxes()` (around L1265–1349).
-- `_dispatch_box_goal()` (around L1622–1823).
-- `_get_current_pose()` (around L1848–1866).
-- `_on_box_result()` (around L2038–2067).
+- `_vehicle_boxes_cb()` / `_process_vehicle_boxes()` (around L1150–1222).
+- `_dispatch_box_goal()` (around L1342–1456).
+- `_get_current_pose()` (around L1492–1507).
+- `_send_nav_goal()` (around L1466–1476).
+- `_on_box_result()` (around L1729–1836).
+- `compute_box_goal()` (`goal_generator.py`, around L12–76).
 
 ### New structured logs added (to trace the chain in future runs)
 - `MISSION_STATE: <state>` — emitted on every state transition.

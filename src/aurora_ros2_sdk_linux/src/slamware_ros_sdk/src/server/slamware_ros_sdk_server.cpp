@@ -1,4 +1,5 @@
 #include  "slamware_ros_sdk_server.h"
+#include <geometry_msgs/msg/transform_stamped.hpp>
 #include <stdexcept>
 #include <cmath>
 #include <memory>
@@ -251,14 +252,15 @@ namespace slamware_ros_sdk {
 
             const auto defaultUpdateIntervalForNoneUpdateWorkers = std::chrono::milliseconds(1000u * 60u);
 
-            {
-                auto svrWk = std::make_shared<ServerOdometryWorker>(this, "Odometry", sfConvFloatSecToChronoMs_(params_.getParameter<float>("odometry_pub_period")));
-                serverWorkers_.push_back(svrWk);
-            }
-
+            // RobotPose before Odometry so each cycle updates robotPose before Odometry publishes odom->base_link TF.
             if (0 < params_.getParameter<float>("robot_pose_pub_period"))
             {
                 auto svrWk = std::make_shared<ServerRobotPoseWorker>(this, "RobotPose", sfConvFloatSecToChronoMs_(params_.getParameter<float>("robot_pose_pub_period")));
+                serverWorkers_.push_back(svrWk);
+            }
+
+            {
+                auto svrWk = std::make_shared<ServerOdometryWorker>(this, "Odometry", sfConvFloatSecToChronoMs_(params_.getParameter<float>("odometry_pub_period")));
                 serverWorkers_.push_back(svrWk);
             }
 
@@ -515,6 +517,23 @@ namespace slamware_ros_sdk {
         if (reinitWorkLoop_())
         {
             RCLCPP_INFO(rclcpp::get_logger("slamware ros sdk server"), "successed to reinit all workers on work loop begin.");
+            // Publish odom -> base_link once immediately so TF chain slamware_map -> odom -> base_link exists
+            // before the first Odometry worker run (diagnostics and Nav2 need it).
+            const std::string odomFrame = params_.getParameter<std::string>("odom_frame");
+            const std::string robotFrame = params_.getParameter<std::string>("robot_frame");
+            geometry_msgs::msg::TransformStamped odomBase;
+            odomBase.header.stamp = get_clock()->now();
+            odomBase.header.frame_id = odomFrame;
+            odomBase.child_frame_id = robotFrame;
+            odomBase.transform.translation.x = 0.0;
+            odomBase.transform.translation.y = 0.0;
+            odomBase.transform.translation.z = 0.0;
+            odomBase.transform.rotation.x = 0.0;
+            odomBase.transform.rotation.y = 0.0;
+            odomBase.transform.rotation.z = 0.0;
+            odomBase.transform.rotation.w = 1.0;
+            tfBrdcstr_->sendTransform(odomBase);
+            RCLCPP_INFO(get_logger(), "Published initial odom->base_link so TF chain slamware_map->base_link exists.");
         }
         else
         {

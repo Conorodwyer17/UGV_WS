@@ -2,11 +2,17 @@
 segmentation_processor_node:
   ros__parameters:
     output_bbx3d_topic: "/darknet_ros_3d/bounding_boxes"  # Expected by inspection_manager
-    interested_classes: ["car", "truck", "car-tire"]  # Class filter; reduces false positives
+    interested_classes: ["car", "truck", "bus", "car-tire"]  # Class filter; reduces false positives
     # Use camera-aligned depth-based point cloud (from depth_to_registered_pointcloud_node)
-    # Aurora's /slamware_ros_sdk_server_node/point_cloud is unorganized SLAM map points, not camera-aligned
+    # Aurora: /slamware_ros_sdk_server_node/point_cloud is unorganized SLAM map points, not camera-aligned
     point_cloud_topic: "/segmentation_processor/registered_pointcloud"
     working_frame: "slamware_map"  # Match inspection_manager world_frame and Aurora map
-    minimum_probability: 0.35
-    min_valid_points: 5  # Reject objects with fewer valid 3D points
+    minimum_probability: 0.3
+    min_valid_points: 3  # Allow smaller tire clusters
+    min_valid_points_tire: 2
+    tire_cluster_tolerance: 0.18
+    tire_max_distance_m: 12.0
     tf_max_age_ms: 250  # Phase D: reject frames when transform age exceeds this (ms)
+    # Segment indices from YOLO are in RGB image size; point cloud is depth size (416x224). Scale accordingly.
+    segment_image_width: 640   # /slamware_ros_sdk_server_node/left_image_raw width
+    segment_image_height: 480  # /slamware_ros_sdk_server_node/left_image_raw height

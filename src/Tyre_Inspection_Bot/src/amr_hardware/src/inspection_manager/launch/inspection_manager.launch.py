@@ -17,6 +17,13 @@ def _inspection_manager_nodes(context):
                 if os.path.isfile(default_cfg):
                     config_file = default_cfg
                     break
+                # When running from install space, config is often in source root (parent of install)
+                if os.path.basename(ws_root) == "install":
+                    parent_root = os.path.dirname(ws_root)
+                    default_cfg = os.path.join(parent_root, "PRODUCTION_CONFIG.yaml")
+                    if os.path.isfile(default_cfg):
+                        config_file = default_cfg
+                        break
     params = []
     if config_file and os.path.isfile(config_file):
         params.append(config_file)
@@ -24,6 +31,7 @@ def _inspection_manager_nodes(context):
         "vehicle_labels": LaunchConfiguration("vehicle_labels"),
         "tire_label": LaunchConfiguration("tire_label"),
         "detection_topic": LaunchConfiguration("detection_topic"),
+        "vehicle_boxes_topic": LaunchConfiguration("vehicle_boxes_topic"),
         "use_dynamic_detection": LaunchConfiguration("use_dynamic_detection"),
         "approach_offset": LaunchConfiguration("approach_offset"),
         "tire_offset": LaunchConfiguration("tire_offset"),
@@ -56,7 +64,7 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             "vehicle_labels",
-            default_value="car,truck",
+            default_value="car,truck,bus",
             description="Comma-separated vehicle class names",
         ),
         DeclareLaunchArgument(
@@ -71,8 +79,8 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             "vehicle_boxes_topic",
-            default_value="",
-            description="Optional: semantic vehicle boxes (e.g. /aurora_semantic/vehicle_bounding_boxes). When set, vehicles from this topic; tires from detection_topic.",
+            default_value="/aurora_semantic/vehicle_bounding_boxes",
+            description="Semantic vehicle boxes (Aurora 2.11). When set, vehicles from this topic; tires from detection_topic. Empty string = use YOLO vehicles from detection_topic.",
         ),
         DeclareLaunchArgument(
             "use_dynamic_detection",

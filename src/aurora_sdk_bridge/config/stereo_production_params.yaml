@@ -1,5 +1,6 @@
-# Production stereo params (aligned with PRODUCTION_CONFIG.yaml Phase K freeze)
-# Loaded by aurora_sdk_bridge.launch.py so bridge uses verified values without manual overrides.
+# Legacy: SGBM stereo params for aurora_sdk_bridge (use_bridge=true, classic Aurora).
+# Default is Aurora 2.11 native depth (use_bridge=false); bridge only used for pre-2.11 devices.
+# Loaded by aurora_sdk_bridge.launch.py.
 aurora_sdk_bridge:
   ros__parameters:
     num_disparities: 160   # PRODUCTION_CONFIG: stereo_num_disparities (must be divisible by 16)

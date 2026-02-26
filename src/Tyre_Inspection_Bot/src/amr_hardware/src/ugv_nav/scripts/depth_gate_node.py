@@ -26,7 +26,10 @@ class DepthGateNode(Node):
         self.declare_parameter("cmd_vel_nav_topic", "cmd_vel_nav")
         self.declare_parameter("cmd_vel_out_topic", "cmd_vel")
         self.declare_parameter("navigation_permitted_topic", "/stereo/navigation_permitted")
-        self.declare_parameter("nav_permitted_default", False)  # Phase G: fail-safe when no message
+        self.declare_parameter(
+            "nav_permitted_default",
+            False,
+        )  # Phase G: fail-safe when no message
         self.declare_parameter("stale_timeout_s", 0.3)  # Halt if no nav_permitted for 300ms
 
         self._cmd_nav_topic = self.get_parameter("cmd_vel_nav_topic").value
@@ -57,7 +60,9 @@ class DepthGateNode(Node):
         # Publish at 20 Hz so robot stops promptly when nav_permitted goes false
         self._timer = self.create_timer(0.05, self._publish)
         self.get_logger().info(
-            f"depth_gate: {self._cmd_nav_topic} -> {self._cmd_out_topic} gated by {self._nav_topic}"
+            "depth_gate: "
+            f"{self._cmd_nav_topic} -> {self._cmd_out_topic} "
+            f"gated by {self._nav_topic}"
         )
 
     def _cmd_cb(self, msg: Twist):

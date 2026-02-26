@@ -53,7 +53,7 @@ Every time the robot starts and the mission runs with a car in view, the system 
 
 Before starting the mission:
 
-1. **Aurora / sensors**: Device online; depth and image topics active (see `docs/AURORA_MISSION_SETUP.md`).
+1. **Aurora / sensors**: Device online; Aurora topics active: `/slamware_ros_sdk_server_node/odom`, `/slamware_ros_sdk_server_node/scan`, `/slamware_ros_sdk_server_node/depth_image_raw`, `/slamware_ros_sdk_server_node/left_image_raw`, etc. (see `docs/AURORA_TOPIC_NODE_REFERENCE.md` and `docs/AURORA_MISSION_SETUP.md`).
 2. **Frames**: `slamware_map` and `map` defined (e.g. static transform); TF tree valid.
 3. **Detection**: `/darknet_ros_3d/bounding_boxes` publishing; segment_3d and depth pipeline running.
 4. **Nav2**: NavigateToPose action server available.
@@ -88,4 +88,4 @@ Start the mission only after the checklist passes. Use `/inspection_manager/star
 - **Retries**: `nav_retry_budget`, `max_capture_retries`, `max_rotation_attempts`, `max_state_repeats`
 - **Timeouts**: `detection_timeout`, `capture_verify_timeout_s`, `hard_mission_timeout`, `tf_watchdog_timeout`
 
-See `PRODUCTION_CONFIG.yaml` and `docs/AURORA_TOPICS_REFERENCE.md` for the full list.
+See `PRODUCTION_CONFIG.yaml` and `docs/AURORA_TOPIC_NODE_REFERENCE.md` for Aurora topic names (all under `/slamware_ros_sdk_server_node/`).

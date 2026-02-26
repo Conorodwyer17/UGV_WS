@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """
-Publishes /stereo/navigation_permitted = True when Aurora native mode is used (use_bridge=false).
-aurora_sdk_bridge normally publishes this based on depth validity; when bridge is not used,
-this node provides it so depth_gate forwards cmd_vel and the robot can move.
+Publishes /stereo/navigation_permitted = True when Aurora native mode is used.
+
+aurora_sdk_bridge normally publishes this based on depth validity. When the
+bridge is not used, this node provides it so depth_gate forwards cmd_vel and
+the robot can move.
 """
 
 import rclpy

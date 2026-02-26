@@ -11,8 +11,8 @@ Production-grade autonomous tire inspection system using Slamtec Aurora firmware
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
 │                    AURORA (slamware_ros_sdk_server_node) — Firmware 2.11                           │
-│  Publishes: scan, odom, map, left_image_raw, right_image_raw                                      │
-│            depth_image_raw (224×416), semantic_segmentation (480×640), semantic_labels (480×640)  │
+│  Publishes (all /slamware_ros_sdk_server_node/<name>): scan, odom, map, left_image_raw,            │
+│            right_image_raw, depth_image_raw (224×416), semantic_segmentation, semantic_labels       │
 │  TF: slamware_map→odom→base_link, camera_left, camera_right, laser, imu_link                      │
 └────────────────────┬──────────────────────────────────────────────────────────────────────────────┘
                      │
@@ -111,7 +111,7 @@ map (Nav2 global_frame)
 
 | Component | Resolution | Purpose |
 |-----------|------------|---------|
-| depth_image_raw | 224×416 | Native depth from device |
+| `/slamware_ros_sdk_server_node/depth_image_raw` | 224×416 | Native depth from device |
 | semantic_labels | 480×640 | COCO80 class IDs (mono8) |
 | aurora_depth_camera_info | 416×224 | Intrinsics for depth |
 | aurora_semantic_fusion | — | Resize semantic→depth, fuse centroid+depth→3D vehicle boxes |

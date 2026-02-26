@@ -80,9 +80,9 @@ install(PROGRAMS
   RENAME depth_to_registered_pointcloud_node
 )
 install(PROGRAMS
-  scripts/test_depth_pipeline.py
+  scripts/vehicle_boxes_marker_node.py
   DESTINATION lib/${PROJECT_NAME}
-  RENAME test_depth_pipeline
+  RENAME vehicle_boxes_marker_node
 )
 
 # Install header files

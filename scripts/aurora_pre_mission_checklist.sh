@@ -10,6 +10,8 @@ AURORA_IP="${AURORA_IP:-192.168.11.1}"
 FAIL=0
 
 echo "=== Pre-mission checklist (Aurora native) ==="
+echo "RMW: ${RMW_IMPLEMENTATION:-<not set, default>}"
+echo ""
 
 # 1) Device baseline
 echo -n "Device (ping $AURORA_IP) ... "
@@ -58,18 +60,35 @@ else
 fi
 
 echo -n "  Nav2 navigate_to_pose action ... "
-if ros2 action list 2>/dev/null | grep -q "navigate_to_pose"; then
-  echo "present"
+nav_info=$(ros2 action info /navigate_to_pose 2>/dev/null) || true
+if echo "$nav_info" | grep -qE "Action servers: [1-9]"; then
+  echo "present (server up)"
 else
-  echo "absent (start Nav2 for mission)"
+  echo "absent (Action servers: 0)"
 fi
 
 # 5) TF: slamware_map -> base_link (required for tire pose -> nav goal)
+# tf2_echo needs time to receive /tf_static; use 5s per attempt, 2 attempts (10s total).
 echo -n "TF slamware_map -> base_link ... "
-if timeout 2 ros2 run tf2_ros tf2_echo slamware_map base_link 2>/dev/null | head -1 | grep -q "At time"; then
+TF_OK=0
+for attempt in 1 2; do
+  out=$(timeout 5 ros2 run tf2_ros tf2_echo slamware_map base_link 2>&1) || true
+  if echo "$out" | grep -m1 "At time" | grep -q "At time"; then
+    TF_OK=1
+    break
+  fi
+  # Show first failure so user sees "Frame does not exist" etc.
+  if [ $attempt -eq 1 ] && echo "$out" | grep -q "Lookup would require extrapolation\|Frame\|Error"; then
+    echo ""
+    echo "    (tf2_echo: $(echo "$out" | head -3))"
+  fi
+done
+if [ $TF_OK -eq 1 ]; then
   echo "OK"
 else
-  echo "FAIL (no transform)"
+  echo "FAIL"
+  echo "    Ensure stack was started with same RMW (e.g. scripts/startup.sh or scripts/mission_launch.sh)."
+  echo "    If stack runs in another terminal, set there: export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp"
   FAIL=1
 fi
 

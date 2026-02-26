@@ -49,7 +49,26 @@ class VehicleInspectionManager(Node):
         self.declare_parameter("vehicle_boxes_topic", "")  # Optional: use semantic vehicle boxes (e.g. /aurora_semantic/vehicle_bounding_boxes); tires still from detection_topic
         self.declare_parameter("world_frame", "slamware_map")  # Must match bounding box frame from segmentation_processor
         self.declare_parameter("base_frame", "base_link")  # Robot base frame
-        self.declare_parameter("detection_timeout", 5.0)  # seconds to wait before recovery
+        self.declare_parameter("map_frame", "map")  # Nav2 map frame
+        self.declare_parameter("require_goal_transform", True)  # Require world->map transform for goals
+        self.declare_parameter("detection_timeout", 5.0)  # seconds to wait before recovery (legacy)
+        self.declare_parameter("detection_stale_s", 2.0)  # seconds without detection_topic messages -> stale
+        self.declare_parameter("vehicle_boxes_stale_s", 2.0)  # seconds without vehicle_boxes_topic -> stale
+        self.declare_parameter("vehicle_search_timeout_s", 180.0)  # total seconds to search before ending mission
+        self.declare_parameter("tire_search_timeout_s", 90.0)  # seconds to wait for tire detection before fallback/next vehicle
+        self.declare_parameter("vehicle_patrol_interval_s", 10.0)  # seconds between patrol steps when no vehicles
+        self.declare_parameter("patrol_step_m", 0.8)  # meters per patrol step
+        self.declare_parameter("patrol_turn_deg", 20.0)  # degrees to bias patrol heading
+        self.declare_parameter("patrol_pause_s", 1.0)  # pause after patrol goal completes
+        self.declare_parameter("patrol_max_attempts", 30)  # max patrol steps per mission
+        self.declare_parameter("vehicle_confirmations_required", 3)  # consecutive frames before accepting vehicle
+        self.declare_parameter("tire_confirmations_required", 2)  # consecutive frames before accepting tire
+        self.declare_parameter("vehicle_confirm_tolerance_m", 1.0)  # meters to consider same vehicle across frames
+        self.declare_parameter("tire_confirm_tolerance_m", 0.5)  # meters to consider same tire across frames
+        self.declare_parameter("vehicle_min_distance_m", 0.5)  # meters from robot to accept vehicle
+        self.declare_parameter("vehicle_max_distance_m", 20.0)  # meters from robot to accept vehicle
+        self.declare_parameter("planned_tire_fallback_enabled", True)  # allow planned tire goals if no tire boxes
+        self.declare_parameter("planned_tire_box_extent_m", 0.25)  # half-extent for planned tire box
         self.declare_parameter("rotation_angle", 0.785)  # 45 degrees in radians
         self.declare_parameter("max_rotation_attempts", 8)  # 8 * 45 = 360 degrees
         self.declare_parameter("rotation_position_offset", 0.1)  # Small forward offset to force Nav2 execution
@@ -75,6 +94,10 @@ class VehicleInspectionManager(Node):
         self.declare_parameter("capture_metadata_topic", "/inspection_manager/capture_metadata")  # JSON metadata for each capture (pose, tire_class, etc.)
         self.declare_parameter("capture_result_topic", "/inspection_manager/capture_result")  # SUCCESS|FAILURE,filename,bytes from photo_capture_service
         self.declare_parameter("photo_trigger_distance", 0.0)  # meters; 0 disables distance gate before capture
+        self.declare_parameter("face_tire_final_yaw", True)  # rotate in place to face tire before capture
+        self.declare_parameter("face_tire_timeout_s", 20.0)  # max seconds to wait for final rotate
+        self.declare_parameter("face_tire_yaw_tolerance", 0.2)  # radians; target yaw tolerance
+        self.declare_parameter("face_tire_yaw_speed", 0.4)  # rad/s for final rotate
         self.declare_parameter("rotation_search_enabled", True)  # allow rotations when no detections
         self.declare_parameter("require_nav_permitted", False)  # gate nav when depth gate disallows motion
         self.declare_parameter("nav_permitted_topic", "/stereo/navigation_permitted")
@@ -102,6 +125,7 @@ class VehicleInspectionManager(Node):
         self.declare_parameter("approach_timeout_s", 120.0)  # max seconds in APPROACH_VEHICLE before cancelling and retrying (avoids stuck nav)
         self.declare_parameter("mission_log_path", "")  # JSONL event log (mission_start, state_transition, nav_result, etc.)
         self.declare_parameter("mission_report_path", "")  # full report JSON at mission end
+        self.declare_parameter("mission_log_fsync", True)  # fsync each log entry for power-loss safety
 
         # Dynamic vehicle detection - vehicles found during mission
         self.detected_vehicles: List[dict] = []  # List of {"box": BoundingBox3d, "position": (x,y,z), "inspected": bool}
@@ -116,12 +140,18 @@ class VehicleInspectionManager(Node):
         self.inspected_tire_positions: List[tuple] = []  # legacy; kept for compatibility
         self._tire_registry: List[Dict[str, Any]] = []  # {id, vehicle_id, position, visited, image_captured}
         self._tire_id_counter = 0
-        self._planned_tire_positions: List[tuple] = []  # planned tire centers from vehicle model
+        self._planned_tire_positions: List[tuple] = []  # planned tire centers for current vehicle
         
         # Recovery state tracking
         self.wait_start_time: Optional[float] = None
         self.rotation_attempts = 0
         self.initial_wait_yaw: Optional[float] = None  # Store yaw when starting to wait
+        # Search/patrol tracking
+        self._vehicle_search_start_time: Optional[float] = None
+        self._tire_search_start_time: Optional[float] = None
+        self._last_patrol_time: Optional[float] = None
+        self._patrol_attempts: int = 0
+        self._patrol_direction: int = 1
 
         # Spin protection: prevent infinite loops
         self._last_state: Optional[str] = None
@@ -140,6 +170,13 @@ class VehicleInspectionManager(Node):
         self._last_approach_offset: Optional[float] = None
         self._last_tire_box: Optional[BoundingBox3d] = None
         self._last_tire_offset: Optional[float] = None
+        # Detection confirmation
+        self._vehicle_confirm_count = 0
+        self._vehicle_confirm_center: Optional[tuple] = None
+        self._tire_confirm_count = 0
+        self._tire_confirm_center: Optional[tuple] = None
+        # Progress stall tracking
+        self._progress_stall_count = 0
 
         # In WAIT_VEHICLE_BOX: dispatch approach once per entry when we have current_vehicle_box (stops spin loop after rotation)
         self._dispatched_approach_this_wait = False
@@ -155,11 +192,19 @@ class VehicleInspectionManager(Node):
         # Mission log file paths (empty = disabled)
         self._mission_log_path = (self.get_parameter("mission_log_path").value or "").strip()
         self._mission_report_path = (self.get_parameter("mission_report_path").value or "").strip()
+        self._mission_log_fsync = bool(self.get_parameter("mission_log_fsync").value)
         # Comprehensive logging: throttle tick_skipped and heartbeat
         self._tf_skip_log_last_time: Optional[float] = None
         self._mission_heartbeat_last_time: Optional[float] = None
         # Phase A: Last detection confidence for diagnostics
         self._last_detection_confidence: Optional[float] = None
+        # Phase A: Detection stream health
+        self._last_detection_msg_time: Optional[float] = None
+        self._last_vehicle_boxes_time: Optional[float] = None
+        self._detection_interval_ema: Optional[float] = None
+        self._vehicle_boxes_interval_ema: Optional[float] = None
+        self._last_detection_stale_log_time: Optional[float] = None
+        self._last_vehicle_stale_log_time: Optional[float] = None
 
         # Phase A/D: Current goal for diagnostics and dry-run
         self._current_goal_pose: Optional[PoseStamped] = None
@@ -182,6 +227,8 @@ class VehicleInspectionManager(Node):
 
         # APPROACH_VEHICLE / INSPECT_TIRE: timeout so we don't wait forever if Nav2 hangs
         self._approach_entered_time: Optional[float] = None
+        self._face_tire_start_time: Optional[float] = None
+        self._face_tire_target_yaw: Optional[float] = None
 
         # INIT: sensor health (aurora_interface/healthy)
         self._sensor_healthy: Optional[bool] = None
@@ -423,6 +470,41 @@ class VehicleInspectionManager(Node):
                 timeout_s = self.get_parameter("detection_timeout").value
                 timeout_remaining = max(0.0, timeout_s - elapsed)
 
+            now = time.time()
+            detection_stale_s = float(self.get_parameter("detection_stale_s").value)
+            vehicle_boxes_stale_s = float(self.get_parameter("vehicle_boxes_stale_s").value)
+            detection_age = None if self._last_detection_msg_time is None else (now - self._last_detection_msg_time)
+            vehicle_boxes_age = None if self._last_vehicle_boxes_time is None else (now - self._last_vehicle_boxes_time)
+            detection_stale = detection_age is None or detection_age > detection_stale_s
+            vehicle_boxes_stale = (
+                bool(self.get_parameter("vehicle_boxes_topic").value)
+                and (vehicle_boxes_age is None or vehicle_boxes_age > vehicle_boxes_stale_s)
+            )
+            if detection_stale and (self._last_detection_stale_log_time is None or (now - self._last_detection_stale_log_time) > 5.0):
+                self._mission_log_append(
+                    "detection_stream_stale",
+                    {
+                        "age_s": detection_age,
+                        "threshold_s": detection_stale_s,
+                        "state": self.current_state,
+                        "topic": self.get_parameter("detection_topic").value,
+                    },
+                    sync=True,
+                )
+                self._last_detection_stale_log_time = now
+            if vehicle_boxes_stale and (self._last_vehicle_stale_log_time is None or (now - self._last_vehicle_stale_log_time) > 5.0):
+                self._mission_log_append(
+                    "vehicle_boxes_stream_stale",
+                    {
+                        "age_s": vehicle_boxes_age,
+                        "threshold_s": vehicle_boxes_stale_s,
+                        "state": self.current_state,
+                        "topic": self.get_parameter("vehicle_boxes_topic").value,
+                    },
+                    sync=True,
+                )
+                self._last_vehicle_stale_log_time = now
+
             diag = {
                 "timestamp": time.time(),
                 "current_state": self.current_state,
@@ -435,6 +517,10 @@ class VehicleInspectionManager(Node):
                 "retry_counter": self.rotation_attempts,
                 "nav_retry_count": self._nav_retry_count,
                 "detection_confidence": self._last_detection_confidence,
+                "detection_stream_age_s": detection_age,
+                "vehicle_boxes_stream_age_s": vehicle_boxes_age,
+                "detection_stream_interval_ema_s": self._detection_interval_ema,
+                "vehicle_boxes_stream_interval_ema_s": self._vehicle_boxes_interval_ema,
                 "tf_valid": tf_valid,
                 "tf_lookup_latency_ms": tf_latency_ms,
                 "tf_watchdog_paused": self._tf_watchdog_paused,
@@ -476,6 +562,7 @@ class VehicleInspectionManager(Node):
             self._tf_last_valid_time = time.time()
             self._tf_watchdog_paused = False
             self._tf_watchdog_paused_since = None
+            self._tf_recently_valid = True
             return True
         except Exception:
             if self._tf_last_valid_time is None:
@@ -489,24 +576,30 @@ class VehicleInspectionManager(Node):
                     )
                     self._tf_watchdog_paused = True
                     self._tf_watchdog_paused_since = time.time()
-        self._mission_log_append(
+                    self._mission_log_append(
                         "tf_watchdog",
                         {"timeout_s": timeout, "state": self.current_state},
                         sync=True,
                     )
-                    # Cancel any in-flight Nav2 goal so robot stops spinning while TF is invalid
+                    # Cancel any in-flight Nav2 goal so robot stops while TF is invalid
                     if self._active_nav_goal_handle is not None:
                         try:
                             self._active_nav_goal_handle.cancel_goal_async()
-                            self.get_logger().info("Cancelled in-flight Nav2 goal due to TF watchdog.")
+                            self.get_logger().info(
+                                "Cancelled in-flight Nav2 goal due to TF watchdog."
+                            )
                         except Exception as e:
                             self.get_logger().warn(f"Failed to cancel Nav2 goal: {e}")
                         self._active_nav_goal_handle = None
                 # After prolonged TF outage, abort mission instead of pausing forever
-                if self._tf_watchdog_paused_since is not None and (time.time() - self._tf_watchdog_paused_since) >= abort_s:
+                if (
+                    self._tf_watchdog_paused_since is not None
+                    and (time.time() - self._tf_watchdog_paused_since) >= abort_s
+                ):
                     self.get_logger().error(
                         f"TF unavailable for {abort_s}s. Aborting mission (ERROR). "
-                        f"Verify Aurora is connected and publishing TF: ros2 run tf2_ros tf2_echo {world_frame} {base_frame}"
+                        f"Verify Aurora is connected and publishing TF: "
+                        f"ros2 run tf2_ros tf2_echo {world_frame} {base_frame}"
                     )
                     self._mission_log_append(
                         "tf_unavailable_abort",
@@ -517,9 +610,16 @@ class VehicleInspectionManager(Node):
                     self._set_state(MissionState.ERROR, cause="tf_unavailable")
                 # Throttled log so we know ticks are being skipped (every 5s)
                 now = time.time()
-                if self._tf_skip_log_last_time is None or (now - self._tf_skip_log_last_time) >= 5.0:
+                if (
+                    self._tf_skip_log_last_time is None
+                    or (now - self._tf_skip_log_last_time) >= 5.0
+                ):
                     self._tf_skip_log_last_time = now
-                    paused_elapsed = (now - self._tf_watchdog_paused_since) if self._tf_watchdog_paused_since else 0
+                    paused_elapsed = (
+                        (now - self._tf_watchdog_paused_since)
+                        if self._tf_watchdog_paused_since
+                        else 0
+                    )
                     self._mission_log_append(
                         "tick_skipped_tf_invalid",
                         {
@@ -536,6 +636,7 @@ class VehicleInspectionManager(Node):
     def _publish_mission_report(self):
         """Publish structured mission report and write JSON to disk for offline review."""
         self._mission_report["total_tires_captured"] = self._total_tires_captured
+        self._mission_report["mission_end_cause"] = self._last_transition_cause
         expected = self._mission_report["total_tires_expected"]
         captured = self._mission_report["total_tires_captured"]
         missing = max(0, expected - captured)
@@ -572,6 +673,7 @@ class VehicleInspectionManager(Node):
                     "success": success_flag,
                     "total_time_s": total_time,
                     "error_states_encountered": self._mission_report["error_states_encountered"],
+                    "mission_end_cause": self._mission_report.get("mission_end_cause"),
                 }
                 with open(report_path, "w") as f:
                     json.dump(report_json, f, indent=2)
@@ -627,7 +729,7 @@ class VehicleInspectionManager(Node):
             "vehicle_detected",
             {
                 "vehicle_id": vehicle_id,
-                "frame_id": "map",
+                "frame_id": frame_id,
                 "x": x,
                 "y": y,
                 "z": z,
@@ -686,6 +788,7 @@ class VehicleInspectionManager(Node):
             d = os.path.dirname(path)
             if d:
                 os.makedirs(d, exist_ok=True)
+            sync = sync or self._mission_log_fsync
             with open(path, "a") as f:
                 f.write(json.dumps({"event": event, "data": data, "t": time.time()}) + "\n")
                 if sync:
@@ -693,6 +796,187 @@ class VehicleInspectionManager(Node):
                     os.fsync(f.fileno())
         except Exception as e:
             self.get_logger().warn(f"Mission log append failed: {e}")
+
+    def _vehicle_box_in_range(self, box: BoundingBox3d) -> bool:
+        """Filter vehicle boxes by distance to robot (prevents far/unstable detections)."""
+        pose = self._get_current_pose()
+        if pose is None:
+            return True
+        center_x = (box.xmin + box.xmax) / 2.0
+        center_y = (box.ymin + box.ymax) / 2.0
+        dx = center_x - pose.pose.position.x
+        dy = center_y - pose.pose.position.y
+        dist = math.sqrt(dx * dx + dy * dy)
+        min_d = float(self.get_parameter("vehicle_min_distance_m").value)
+        max_d = float(self.get_parameter("vehicle_max_distance_m").value)
+        if dist < min_d or dist > max_d:
+            self._mission_log_append(
+                "vehicle_out_of_range",
+                {"distance_m": round(dist, 2), "min_m": min_d, "max_m": max_d},
+                sync=True,
+            )
+            return False
+        return True
+
+    def _confirm_vehicle_box(self, box: BoundingBox3d) -> bool:
+        required = int(self.get_parameter("vehicle_confirmations_required").value)
+        if required <= 1:
+            return True
+        center = (
+            (box.xmin + box.xmax) / 2.0,
+            (box.ymin + box.ymax) / 2.0,
+            (box.zmin + box.zmax) / 2.0,
+        )
+        tol = float(self.get_parameter("vehicle_confirm_tolerance_m").value)
+        if self._vehicle_confirm_center:
+            dx = center[0] - self._vehicle_confirm_center[0]
+            dy = center[1] - self._vehicle_confirm_center[1]
+            if math.sqrt(dx * dx + dy * dy) <= tol:
+                self._vehicle_confirm_count += 1
+            else:
+                self._vehicle_confirm_center = center
+                self._vehicle_confirm_count = 1
+        else:
+            self._vehicle_confirm_center = center
+            self._vehicle_confirm_count = 1
+        if self._vehicle_confirm_count >= required:
+            self._vehicle_confirm_count = 0
+            return True
+        return False
+
+    def _confirm_tire_box(self, tire_center: tuple) -> bool:
+        required = int(self.get_parameter("tire_confirmations_required").value)
+        if required <= 1:
+            return True
+        tol = float(self.get_parameter("tire_confirm_tolerance_m").value)
+        if self._tire_confirm_center:
+            dx = tire_center[0] - self._tire_confirm_center[0]
+            dy = tire_center[1] - self._tire_confirm_center[1]
+            if math.sqrt(dx * dx + dy * dy) <= tol:
+                self._tire_confirm_count += 1
+            else:
+                self._tire_confirm_center = tire_center
+                self._tire_confirm_count = 1
+        else:
+            self._tire_confirm_center = tire_center
+            self._tire_confirm_count = 1
+        if self._tire_confirm_count >= required:
+            self._tire_confirm_count = 0
+            return True
+        return False
+
+    def _dispatch_patrol_goal(self) -> bool:
+        """Dispatch a short patrol goal to search for vehicles."""
+        pose = self._get_current_pose_in_map_frame()
+        if pose is None:
+            self.get_logger().warn("Patrol: cannot get pose in map frame.")
+            return False
+        map_frame = self.get_parameter("map_frame").value
+        if pose.header.frame_id != map_frame and self.get_parameter("require_goal_transform").value:
+            self.get_logger().warn(
+                f"Patrol: pose frame {pose.header.frame_id} != {map_frame}; cannot dispatch."
+            )
+            self._mission_log_append(
+                "patrol_dispatch_blocked",
+                {"reason": "map_frame_unavailable", "frame": pose.header.frame_id},
+                sync=True,
+            )
+            return False
+        if self.get_parameter("require_nav_permitted").value and self._nav_permitted is not True:
+            self._last_dispatch_fail_reason = "nav_permitted_blocked"
+            self._mission_log_append(
+                "nav_gate_blocked_dispatch",
+                {
+                    "state": self.current_state,
+                    "nav_permitted": self._nav_permitted,
+                    "last_nav_permitted_time": self._last_nav_permitted_time,
+                    "topic": self.get_parameter("nav_permitted_topic").value,
+                },
+                sync=True,
+            )
+            return False
+        current_yaw = yaw_from_quaternion(pose.pose.orientation)
+        turn_deg = float(self.get_parameter("patrol_turn_deg").value)
+        step = float(self.get_parameter("patrol_step_m").value)
+        new_yaw = current_yaw + math.radians(turn_deg * self._patrol_direction)
+        self._patrol_direction *= -1
+
+        goal = PoseStamped()
+        goal.header.frame_id = map_frame if pose.header.frame_id == map_frame else pose.header.frame_id
+        goal.header.stamp = self.get_clock().now().to_msg()
+        goal.pose.position.x = pose.pose.position.x + step * math.cos(new_yaw)
+        goal.pose.position.y = pose.pose.position.y + step * math.sin(new_yaw)
+        goal.pose.position.z = pose.pose.position.z
+        goal.pose.orientation = quaternion_from_yaw(new_yaw)
+
+        sent = send_nav_goal(self, goal, self._on_patrol_done)
+        self._mission_log_append(
+            "patrol_dispatched",
+            {
+                "sent": sent,
+                "step_m": step,
+                "turn_deg": turn_deg,
+                "goal_x": goal.pose.position.x,
+                "goal_y": goal.pose.position.y,
+            },
+            sync=True,
+        )
+        return sent
+
+    def _dispatch_planned_tire_goal(self, target_pos: tuple) -> bool:
+        """Fallback: dispatch a goal to a planned tire position when detection is missing."""
+        if self.get_parameter("require_nav_permitted").value and self._nav_permitted is not True:
+            self._last_dispatch_fail_reason = "nav_permitted_blocked"
+            self._mission_log_append(
+                "nav_gate_blocked_dispatch",
+                {
+                    "state": self.current_state,
+                    "nav_permitted": self._nav_permitted,
+                    "last_nav_permitted_time": self._last_nav_permitted_time,
+                    "topic": self.get_parameter("nav_permitted_topic").value,
+                },
+                sync=True,
+            )
+            return False
+        map_frame = self.get_parameter("map_frame").value
+        if self.get_parameter("require_goal_transform").value:
+            try:
+                self.tf_buffer.lookup_transform(map_frame, self.get_parameter("world_frame").value, rclpy.time.Time())
+            except Exception:
+                self.get_logger().warn("Planned tire: required map transform unavailable; cannot dispatch.")
+                self._mission_log_append(
+                    "planned_tire_dispatch_blocked",
+                    {"reason": "map_transform_unavailable", "frame": map_frame},
+                    sync=True,
+                )
+                return False
+        extent = float(self.get_parameter("planned_tire_box_extent_m").value)
+        tire_label = self.get_parameter("tire_label").value
+        box = BoundingBox3d()
+        box.object_name = tire_label
+        box.probability = 0.5
+        box.xmin = target_pos[0] - extent
+        box.xmax = target_pos[0] + extent
+        box.ymin = target_pos[1] - extent
+        box.ymax = target_pos[1] + extent
+        box.zmin = target_pos[2] - extent
+        box.zmax = target_pos[2] + extent
+        self._last_tire_box = box
+        self._last_tire_offset = self.get_parameter("tire_offset").value
+        self._mission_log_append(
+            "tire_planned_fallback",
+            {"position": target_pos, "extent": extent},
+            sync=True,
+        )
+        return self._dispatch_box_goal(box, offset=self._last_tire_offset)
+
+    def _sync_planned_tires_for_current_vehicle(self) -> None:
+        """Load planned tires from current vehicle data into active list."""
+        if self.current_vehicle_idx < len(self.detected_vehicles):
+            planned = self.detected_vehicles[self.current_vehicle_idx].get("planned_tires", [])
+            self._planned_tire_positions = list(planned) if planned else []
+        else:
+            self._planned_tire_positions = []
 
     def _save_vehicle_position(self, box: BoundingBox3d):
         """Save detected vehicle position to detected_vehicles list and publish vehicle_detected anchor (map frame)."""
@@ -715,6 +999,7 @@ class VehicleInspectionManager(Node):
 
         # Resolve vehicle center in map frame and yaw (vehicle "facing" robot) for anchoring
         world_frame = self.get_parameter("world_frame").value
+        map_frame = self.get_parameter("map_frame").value
         pose_slam = PoseStamped()
         pose_slam.header.frame_id = world_frame
         pose_slam.header.stamp = self.get_clock().now().to_msg()
@@ -724,7 +1009,7 @@ class VehicleInspectionManager(Node):
         pose_slam.pose.orientation = Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
         try:
             transform = self.tf_buffer.lookup_transform(
-                "map", world_frame, rclpy.time.Time(), timeout=rclpy.duration.Duration(seconds=2.0)
+                map_frame, world_frame, rclpy.time.Time(), timeout=rclpy.duration.Duration(seconds=2.0)
             )
             pose_map = tf2_geometry_msgs.do_transform_pose_stamped(pose_slam, transform)
             anchor_x = pose_map.pose.position.x
@@ -745,7 +1030,7 @@ class VehicleInspectionManager(Node):
             anchor_yaw = 0.0
 
         vehicle_id = len(self.detected_vehicles) + 1
-        anchor_pose = {"frame_id": "map", "x": anchor_x, "y": anchor_y, "z": anchor_z, "yaw": anchor_yaw}
+        anchor_pose = {"frame_id": map_frame, "x": anchor_x, "y": anchor_y, "z": anchor_z, "yaw": anchor_yaw}
 
         vehicle_data = {
             "box": box,
@@ -764,7 +1049,7 @@ class VehicleInspectionManager(Node):
 
         self._publish_vehicle_detected(
             vehicle_id=vehicle_id,
-            frame_id="map",
+            frame_id=map_frame,
             x=anchor_x, y=anchor_y, z=anchor_z,
             yaw=anchor_yaw,
             confidence=float(box.probability),
@@ -778,18 +1063,21 @@ class VehicleInspectionManager(Node):
         ) if robot_pose else None
         wheelbase = float(self.get_parameter("vehicle_wheelbase_m").value)
         track = float(self.get_parameter("vehicle_track_m").value)
-        self._planned_tire_positions = estimate_tire_positions(
+        planned = estimate_tire_positions(
             (center_x, center_y, center_z),
             robot_pos,
             wheelbase_m=wheelbase,
             track_m=track,
         )
-        if self._planned_tire_positions:
+        if planned:
+            vehicle_data["planned_tires"] = list(planned)
+            if self.current_vehicle_idx >= len(self.detected_vehicles):
+                self._planned_tire_positions = list(planned)
             self._mission_log_append(
                 "tire_plan",
                 {
                     "vehicle_id": vehicle_id,
-                    "positions": self._planned_tire_positions,
+                    "positions": planned,
                     "wheelbase_m": wheelbase,
                     "track_m": track,
                 },
@@ -893,7 +1181,7 @@ class VehicleInspectionManager(Node):
                     self._last_goal_dispatch_time = None
 
         # Progress watchdog: detect stall or spin during active motion
-        if self.current_state in (MissionState.APPROACH_VEHICLE, MissionState.INSPECT_TIRE):
+        if self.current_state in (MissionState.APPROACH_VEHICLE, MissionState.INSPECT_TIRE, MissionState.FACE_TIRE):
             pose = self._get_current_pose()
             yaw = self._get_current_yaw()
             now = time.time()
@@ -922,7 +1210,25 @@ class VehicleInspectionManager(Node):
                                 },
                                 sync=True,
                             )
+                            self._progress_stall_count += 1
+                            if self._progress_stall_count >= 3:
+                                self.get_logger().warn(
+                                    "Repeated progress stalls; cancelling goal and retrying."
+                                )
+                                if self._active_nav_goal_handle is not None:
+                                    try:
+                                        self._active_nav_goal_handle.cancel_goal_async()
+                                    except Exception as e:
+                                        self.get_logger().warn(f"Cancel goal after stall: {e}")
+                                    self._active_nav_goal_handle = None
+                                if self.current_state == MissionState.APPROACH_VEHICLE:
+                                    self._set_state(MissionState.WAIT_VEHICLE_BOX, cause="progress_stall")
+                                elif self.current_state == MissionState.INSPECT_TIRE:
+                                    self._set_state(MissionState.WAIT_TIRE_BOX, cause="progress_stall")
+                                self._progress_stall_count = 0
                         if (
+                            self.current_state != MissionState.FACE_TIRE
+                            and
                             elapsed >= self.get_parameter("spin_detect_min_time_s").value
                             and dist < self.get_parameter("spin_detect_distance_m").value
                             and yaw_delta >= self.get_parameter("spin_detect_yaw_deg").value
@@ -955,7 +1261,7 @@ class VehicleInspectionManager(Node):
                 )
                 self._mission_report["error_states_encountered"] += 1
                 self._publish_mission_report()
-                self._set_state(MissionState.ERROR)
+                self._set_state(MissionState.ERROR, cause="hard_mission_timeout")
                 return
 
         use_dynamic = self.get_parameter("use_dynamic_detection").value
@@ -975,10 +1281,15 @@ class VehicleInspectionManager(Node):
                             f"Nav2 navigate_to_pose not available after {nav2_timeout}s. Mission not started. "
                             "Ensure full_bringup has started Nav2 and lifecycle has completed."
                         )
-                    self._mission_log_append("nav2_unavailable", {"timeout_s": nav2_timeout}, sync=True)
+                        self._mission_log_append(
+                            "nav2_unavailable",
+                            {"timeout_s": nav2_timeout},
+                            sync=True,
+                        )
                         self._mission_report["error_states_encountered"] += 1
                         self._set_state(MissionState.ERROR, cause="nav2_unavailable")
                         self._nav2_wait_start_time = None
+                        return
                     elif elapsed - self._nav2_wait_last_log_elapsed >= 10.0 or self._nav2_wait_last_log_elapsed == 0.0:
                         self.get_logger().info(
                             f"Waiting for Nav2 navigate_to_pose action server... ({elapsed:.0f}s / {nav2_timeout}s)"
@@ -998,6 +1309,7 @@ class VehicleInspectionManager(Node):
             # Require TF (slamware_map->base_link) valid and stable before starting so we don't enter SEARCH_VEHICLE then immediately pause
             world_frame = self.get_parameter("world_frame").value
             base_frame = self.get_parameter("base_frame").value
+            map_frame = self.get_parameter("map_frame").value
             tf_wait_timeout = self.get_parameter("tf_wait_timeout").value
             tf_stable_s = self.get_parameter("tf_stable_s").value
             now_tf = time.time()
@@ -1053,6 +1365,45 @@ class VehicleInspectionManager(Node):
                         sync=True,
                     )
                 return
+            if self.get_parameter("require_goal_transform").value:
+                try:
+                    self.tf_buffer.lookup_transform(map_frame, world_frame, rclpy.time.Time())
+                except Exception:
+                    if self._tf_wait_start_time is None:
+                        self._tf_wait_start_time = time.time()
+                    elapsed = time.time() - self._tf_wait_start_time
+                    if elapsed > tf_wait_timeout:
+                        self.get_logger().error(
+                            f"TF ({map_frame}->{world_frame}) not available after {tf_wait_timeout}s. "
+                            "Mission not started. Ensure Nav2 is running and map frame exists."
+                        )
+                        self._mission_log_append(
+                            "map_tf_unavailable_at_start",
+                            {"timeout_s": tf_wait_timeout, "frame": f"{map_frame}->{world_frame}"},
+                            sync=True,
+                        )
+                        self._mission_report["error_states_encountered"] += 1
+                        self._set_state(MissionState.ERROR, cause="map_tf_unavailable_at_start")
+                        self._tf_wait_start_time = None
+                        return
+                    if elapsed - self._tf_wait_last_log_elapsed >= 10.0 or self._tf_wait_last_log_elapsed == 0.0:
+                        self.get_logger().info(
+                            f"Waiting for TF {map_frame}->{world_frame}... ({elapsed:.0f}s / {tf_wait_timeout}s)"
+                        )
+                        self._tf_wait_last_log_elapsed = elapsed
+                        self._mission_log_append(
+                            "idle_wait_map_tf",
+                            {
+                                "elapsed_s": round(elapsed, 1),
+                                "timeout_s": tf_wait_timeout,
+                                "frame": f"{map_frame}->{world_frame}",
+                            },
+                            sync=True,
+                        )
+                    return
+                # Reset TF wait timer on success
+                self._tf_wait_start_time = None
+                self._tf_wait_last_log_elapsed = 0.0
             self._mission_log_append(
                 "idle_passed",
                 {"nav2_ok": True, "tf_ok": True, "tf_stable_s": tf_stable_s},
@@ -1082,7 +1433,7 @@ class VehicleInspectionManager(Node):
                 trucks = self._load_trucks()
                 if not trucks:
                     self.get_logger().warn("No vehicles configured; mission done.")
-                    self._set_state(MissionState.DONE)
+                    self._set_state(MissionState.DONE, cause="no_vehicles_configured")
                     return
                 self.get_logger().info("Starting mission with YAML vehicle list (legacy mode).")
                 self._dispatch_standoff_goal()
@@ -1122,14 +1473,44 @@ class VehicleInspectionManager(Node):
                         len(self.detected_vehicles) * self.get_parameter("expected_tires_per_vehicle").value
                     )
                     self._publish_mission_report()
-                    self._set_state(MissionState.DONE)
+                    self._set_state(MissionState.DONE, cause="all_detected_vehicles_inspected")
                 return
-            # No vehicles detected: rotate in place to search (active search)
+            # No vehicles detected: patrol/rotate with timeout
             if self.wait_start_time is not None:
                 elapsed = time.time() - self.wait_start_time
                 timeout = self.get_parameter("detection_timeout").value
+                search_timeout = self.get_parameter("vehicle_search_timeout_s").value
                 max_rot = self.get_parameter("max_rotation_attempts").value
+                if self._vehicle_search_start_time is not None:
+                    total_elapsed = time.time() - self._vehicle_search_start_time
+                    if total_elapsed > search_timeout:
+                        self.get_logger().warn(
+                            f"Vehicle search timeout ({total_elapsed:.0f}s). Ending mission."
+                        )
+                        self._mission_report["total_vehicles"] = len(self.detected_vehicles) if self.detected_vehicles else 0
+                        self._mission_report["total_tires_expected"] = (
+                            len(self.detected_vehicles) * self.get_parameter("expected_tires_per_vehicle").value
+                        )
+                        self._publish_mission_report()
+                        self._set_state(MissionState.DONE, cause="vehicle_search_timeout")
+                        return
                 if elapsed > timeout:
+                    # Attempt slow patrol step
+                    now = time.time()
+                    patrol_interval = self.get_parameter("vehicle_patrol_interval_s").value
+                    if (
+                        self._last_patrol_time is None
+                        or (now - self._last_patrol_time) >= patrol_interval
+                    ):
+                        if self._patrol_attempts < int(self.get_parameter("patrol_max_attempts").value):
+                            self._patrol_attempts += 1
+                            self._last_patrol_time = now
+                            self.get_logger().info(
+                                f"No vehicles after {elapsed:.1f}s. Patrol step {self._patrol_attempts}."
+                            )
+                            self._dispatch_patrol_goal()
+                            self._set_state(MissionState.PATROL_SEARCH, cause="patrol_search")
+                            return
                     if self.get_parameter("rotation_search_enabled").value and self.rotation_attempts < max_rot:
                         self.get_logger().info(
                             f"No vehicle detected after {elapsed:.1f}s. "
@@ -1145,11 +1526,14 @@ class VehicleInspectionManager(Node):
                             len(self.detected_vehicles) * self.get_parameter("expected_tires_per_vehicle").value
                         )
                         self._publish_mission_report()
-                        self._set_state(MissionState.DONE)
+                        self._set_state(MissionState.DONE, cause="vehicle_search_exhausted")
             return
 
         if self.current_state == MissionState.TURN_IN_PLACE_SEARCH:
             return  # waiting on rotation to complete
+
+        if self.current_state == MissionState.PATROL_SEARCH:
+            return  # waiting on patrol nav to complete
 
         if self.current_state == MissionState.WAIT_VEHICLE_BOX:
             # Whenever we have current_vehicle_box, dispatch approach on first tick (stops spin loop; works after SEARCH, NEXT_VEHICLE, or TURN_IN_PLACE_VEHICLE)
@@ -1238,7 +1622,7 @@ class VehicleInspectionManager(Node):
             # Check for timeout and trigger recovery if needed
             if self.wait_start_time is not None:
                 elapsed = time.time() - self.wait_start_time
-                timeout = self.get_parameter("detection_timeout").value
+                timeout = self.get_parameter("tire_search_timeout_s").value
                 if elapsed > timeout:
                     if self.get_parameter("turn_in_place_enabled").value and self.rotation_attempts < self.get_parameter("max_rotation_attempts").value:
                         self.get_logger().warn(
@@ -1248,6 +1632,20 @@ class VehicleInspectionManager(Node):
                         )
                         self._dispatch_rotation_goal(is_vehicle=False)
                     else:
+                        # Planned tire fallback before moving on
+                        if (
+                            self.get_parameter("planned_tire_fallback_enabled").value
+                            and self._planned_tire_positions
+                        ):
+                            target = self._planned_tire_positions.pop(0)
+                            if self.current_vehicle_idx < len(self.detected_vehicles):
+                                self.detected_vehicles[self.current_vehicle_idx]["planned_tires"] = list(self._planned_tire_positions)
+                            self.get_logger().warn(
+                                f"No tire boxes after {elapsed:.1f}s. Using planned tire fallback: {target}."
+                            )
+                            if self._dispatch_planned_tire_goal(target):
+                                self._set_state(MissionState.INSPECT_TIRE, cause="planned_tire_fallback")
+                                return
                         # Check if we have enough tires inspected (typically 4 per vehicle)
                         inspected_count = len(self.inspected_tire_positions)
                         self.get_logger().warn(
@@ -1283,6 +1681,29 @@ class VehicleInspectionManager(Node):
                     self._set_state(MissionState.WAIT_TIRE_BOX, cause="tire_approach_timeout")
             return  # waiting on navigation and photo capture
 
+        if self.current_state == MissionState.FACE_TIRE:
+            if self._face_tire_start_time is not None:
+                timeout_s = float(self.get_parameter("face_tire_timeout_s").value)
+                if (time.time() - self._face_tire_start_time) > timeout_s:
+                    self.get_logger().warn(
+                        f"Face tire timeout ({timeout_s}s); cancelling rotation and returning to WAIT_TIRE_BOX."
+                    )
+                    self._mission_log_append(
+                        "face_tire_timeout",
+                        {"timeout_s": timeout_s, "state": self.current_state},
+                        sync=True,
+                    )
+                    if self._active_nav_goal_handle is not None:
+                        try:
+                            self._active_nav_goal_handle.cancel_goal_async()
+                        except Exception as e:
+                            self.get_logger().warn(f"Cancel face_tire goal on timeout: {e}")
+                        self._active_nav_goal_handle = None
+                    self._face_tire_start_time = None
+                    self._face_tire_target_yaw = None
+                    self._set_state(MissionState.WAIT_TIRE_BOX, cause="face_tire_timeout")
+            return
+
         if self.current_state == MissionState.VERIFY_CAPTURE:
             timeout_s = self.get_parameter("capture_verify_timeout_s").value
             if self._verify_capture_start_time is not None and (time.time() - self._verify_capture_start_time) > timeout_s:
@@ -1302,7 +1723,7 @@ class VehicleInspectionManager(Node):
                 self.current_vehicle_box = un_inspected[0]["box"]
                 self.current_tire_idx = 0
                 self.inspected_tire_positions = []  # Reset for next vehicle
-                self._planned_tire_positions = []
+                self._sync_planned_tires_for_current_vehicle()
                 self.rotation_attempts = 0  # Reset rotation attempts
                 self.get_logger().info(
                     f"Moving to vehicle {self.current_vehicle_idx + 1}/{len(self.detected_vehicles)} "
@@ -1316,12 +1737,21 @@ class VehicleInspectionManager(Node):
                     len(self.detected_vehicles) * self.get_parameter("expected_tires_per_vehicle").value
                 )
                 self._publish_mission_report()
-                self._set_state(MissionState.DONE)
+                self._set_state(MissionState.DONE, cause="all_vehicles_inspected")
             return
 
     # ----------------------- Detections ----------------------- #
     def _vehicle_boxes_cb(self, msg: BoundingBoxes3d):
         """Semantic vehicle boxes (Aurora 2.11). Vehicles from this topic; tires from detection_topic."""
+        now = time.time()
+        if self._last_vehicle_boxes_time is not None:
+            interval = now - self._last_vehicle_boxes_time
+            if interval >= 0:
+                if self._vehicle_boxes_interval_ema is None:
+                    self._vehicle_boxes_interval_ema = interval
+                else:
+                    self._vehicle_boxes_interval_ema = (0.2 * interval) + (0.8 * self._vehicle_boxes_interval_ema)
+        self._last_vehicle_boxes_time = now
         n = len(msg.bounding_boxes)
         if n > 0:
             self.get_logger().info(
@@ -1339,8 +1769,9 @@ class VehicleInspectionManager(Node):
         if use_dynamic:
             for box in boxes:
                 if box.object_name.lower() in [label.lower() for label in vehicle_labels]:
-                    if box.probability >= min_vehicle_prob:
-                        self._save_vehicle_position(box)
+                    if box.probability >= min_vehicle_prob and self._vehicle_box_in_range(box):
+                        if self._confirm_vehicle_box(box):
+                            self._save_vehicle_position(box)
 
         if self.current_state == MissionState.SEARCH_VEHICLE:
             return
@@ -1365,6 +1796,15 @@ class VehicleInspectionManager(Node):
                 target_pos = self.detected_vehicles[self.current_vehicle_idx].get("position")
             vehicle_box = find_vehicle_box(boxes, vehicle_labels, min_vehicle_prob, target_position=target_pos)
             if vehicle_box:
+                if not self._vehicle_box_in_range(vehicle_box):
+                    return
+                if not self._confirm_vehicle_box(vehicle_box):
+                    self._mission_log_append(
+                        "vehicle_confirmation_pending",
+                        {"state": self.current_state, "required": self.get_parameter("vehicle_confirmations_required").value},
+                        sync=True,
+                    )
+                    return
                 log_bounding_box(self.get_logger(), vehicle_box, f"VEHICLE_{vehicle_box.object_name.upper()}")
                 self.current_vehicle_box = vehicle_box
                 if use_dynamic:
@@ -1403,6 +1843,15 @@ class VehicleInspectionManager(Node):
             return
 
     def _detection_cb(self, msg: BoundingBoxes3d):
+        now = time.time()
+        if self._last_detection_msg_time is not None:
+            interval = now - self._last_detection_msg_time
+            if interval >= 0:
+                if self._detection_interval_ema is None:
+                    self._detection_interval_ema = interval
+                else:
+                    self._detection_interval_ema = (0.2 * interval) + (0.8 * self._detection_interval_ema)
+        self._last_detection_msg_time = now
         vehicle_boxes_topic = self.get_parameter("vehicle_boxes_topic").value
         vehicle_labels = parse_vehicle_labels(self.get_parameter("vehicle_labels").value)
         tire_label = self.get_parameter("tire_label").value
@@ -1451,6 +1900,13 @@ class VehicleInspectionManager(Node):
                     (tire_box.ymin + tire_box.ymax) / 2.0,
                     (tire_box.zmin + tire_box.zmax) / 2.0
                 )
+                if not self._confirm_tire_box(tire_center):
+                    self._mission_log_append(
+                        "tire_confirmation_pending",
+                        {"state": self.current_state, "required": self.get_parameter("tire_confirmations_required").value},
+                        sync=True,
+                    )
+                    return
                 self.get_logger().info(
                     f"Tire {tire_num} detected at ({tire_center[0]:.2f}, {tire_center[1]:.2f}, {tire_center[2]:.2f}); "
                     f"moving to inspect. Already inspected: {len(self.inspected_tire_positions)}"
@@ -1496,6 +1952,8 @@ class VehicleInspectionManager(Node):
                         return (p[0] - tire_xy[0]) ** 2 + (p[1] - tire_xy[1]) ** 2
                     closest_idx = min(range(len(self._planned_tire_positions)), key=lambda i: _plan_dist_sq(self._planned_tire_positions[i]))
                     self._planned_tire_positions.pop(closest_idx)
+                    if self.current_vehicle_idx < len(self.detected_vehicles):
+                        self.detected_vehicles[self.current_vehicle_idx]["planned_tires"] = list(self._planned_tire_positions)
                 self._dispatch_box_goal(tire_box, offset=self._last_tire_offset)
                 self._set_state(MissionState.INSPECT_TIRE, cause="tire_detected")
             else:
@@ -1542,13 +2000,29 @@ class VehicleInspectionManager(Node):
         Robot pose must be looked up in the SAME frame.
         Returns True if the goal was sent to Nav2, False otherwise (caller can retry).
         """
+        if (
+            self.get_parameter("require_nav_permitted").value
+            and self._nav_permitted is not True
+        ):
+            self._last_dispatch_fail_reason = "nav_permitted_blocked"
+            self._mission_log_append(
+                "nav_gate_blocked_dispatch",
+                {
+                    "state": self.current_state,
+                    "nav_permitted": self._nav_permitted,
+                    "last_nav_permitted_time": self._last_nav_permitted_time,
+                    "topic": self.get_parameter("nav_permitted_topic").value,
+                },
+                sync=True,
+            )
+            return False
         goal_info = compute_box_goal(self, box, offset)
         if goal_info is None:
             world_frame = self.get_parameter("world_frame").value
             self.get_logger().error(
                 f"Cannot get robot pose in {world_frame} frame! Cannot compute goal."
             )
-            self._last_dispatch_fail_reason = "robot_pose_unavailable"
+            self._last_dispatch_fail_reason = "robot_pose_or_transform_unavailable"
             self._dispatch_fail_count += 1
             return False
 
@@ -1699,10 +2173,11 @@ class VehicleInspectionManager(Node):
         pose = self._get_current_pose()
         if pose is None:
             return None
+        map_frame = self.get_parameter("map_frame").value
         transformed = tf_transform_pose(
             self.tf_buffer,
             pose,
-            "map",
+            map_frame,
             timeout_s=2.0,
             logger=self.get_logger(),
         )
@@ -1742,7 +2217,7 @@ class VehicleInspectionManager(Node):
         in the direction of the new heading. This forces Nav2 to rotate to align
         with the goal orientation.
         """
-        current_pose = self._get_current_pose()
+        current_pose = self._get_current_pose_in_map_frame()
         if current_pose is None:
             self.get_logger().error("Cannot get current pose for rotation. Aborting recovery.")
             if is_vehicle:
@@ -1753,6 +2228,30 @@ class VehicleInspectionManager(Node):
                     self._set_state(MissionState.NEXT_VEHICLE)
                 else:
                     self._set_state(MissionState.WAIT_TIRE_BOX)
+            return
+        map_frame = self.get_parameter("map_frame").value
+        if current_pose.header.frame_id != map_frame and self.get_parameter("require_goal_transform").value:
+            self.get_logger().warn(
+                f"Rotation: pose frame {current_pose.header.frame_id} != {map_frame}; cannot dispatch."
+            )
+            self._mission_log_append(
+                "rotation_dispatch_blocked",
+                {"reason": "map_frame_unavailable", "frame": current_pose.header.frame_id},
+                sync=True,
+            )
+            return
+        if self.get_parameter("require_nav_permitted").value and self._nav_permitted is not True:
+            self._last_dispatch_fail_reason = "nav_permitted_blocked"
+            self._mission_log_append(
+                "nav_gate_blocked_dispatch",
+                {
+                    "state": self.current_state,
+                    "nav_permitted": self._nav_permitted,
+                    "last_nav_permitted_time": self._last_nav_permitted_time,
+                    "topic": self.get_parameter("nav_permitted_topic").value,
+                },
+                sync=True,
+            )
             return
 
         current_yaw = yaw_from_quaternion(current_pose.pose.orientation)
@@ -1776,7 +2275,7 @@ class VehicleInspectionManager(Node):
         offset = self.get_parameter("rotation_position_offset").value
         
         goal_pose = PoseStamped()
-        goal_pose.header.frame_id = current_pose.header.frame_id
+        goal_pose.header.frame_id = map_frame if current_pose.header.frame_id == map_frame else current_pose.header.frame_id
         goal_pose.header.stamp = self.get_clock().now().to_msg()  # Use current time
         # Add small forward offset along new heading to force rotation execution
         goal_pose.pose.position.x = current_pose.pose.position.x + offset * math.cos(new_yaw)
@@ -1897,21 +2396,22 @@ class VehicleInspectionManager(Node):
         self.get_logger().info(
             f"NAV_FEEDBACK: goal=box status={status} success={nav_succeeded} state={self.current_state}"
         )
-            self._mission_log_append(
-                "nav_result",
-                {
-                    "goal": "box",
-                    "status": int(status),
-                    "success": nav_succeeded,
-                    "state": self.current_state,
-                    "nav_retry_count": self._nav_retry_count,
-                },
-                sync=True,
-            )
+        self._mission_log_append(
+            "nav_result",
+            {
+                "goal": "box",
+                "status": int(status),
+                "success": nav_succeeded,
+                "state": self.current_state,
+                "nav_retry_count": self._nav_retry_count,
+            },
+            sync=True,
+        )
 
         if not nav_succeeded:
             self._nav_retry_count += 1
             budget = self.get_parameter("nav_retry_budget").value
+            self._progress_stall_count += 1
             if self.current_state == MissionState.APPROACH_VEHICLE:
                 if self._nav_retry_count <= budget and self._last_approach_box is not None:
                     self.get_logger().warn(
@@ -1951,26 +2451,135 @@ class VehicleInspectionManager(Node):
                 return
 
         self._nav_retry_count = 0
+        self._progress_stall_count = 0
 
         if self.current_state == MissionState.APPROACH_VEHICLE:
             self._current_goal_pose = None
             self.current_tire_idx = 0
             self.inspected_tire_positions = []
             self.rotation_attempts = 0
+            self._sync_planned_tires_for_current_vehicle()
             self._set_state(MissionState.WAIT_TIRE_BOX, cause="nav_arrived_vehicle")
             return
 
         if self.current_state == MissionState.INSPECT_TIRE:
-            trigger_threshold = float(self.get_parameter("photo_trigger_distance").value)
-            distance_to_goal = None
-            if self._current_goal_pose is not None:
-                pose_map = self._get_current_pose_in_map_frame()
-                if pose_map is not None:
-                    dx = pose_map.pose.position.x - self._current_goal_pose.pose.position.x
-                    dy = pose_map.pose.position.y - self._current_goal_pose.pose.position.y
-                    distance_to_goal = math.sqrt(dx * dx + dy * dy)
+            if self.get_parameter("face_tire_final_yaw").value:
+                outcome = self._dispatch_face_tire_goal()
+                if outcome == "sent":
+                    self._set_state(MissionState.FACE_TIRE, cause="face_tire_rotation")
+                elif outcome == "failed":
+                    self._set_state(MissionState.WAIT_TIRE_BOX, cause="face_tire_dispatch_failed")
+                return
+            self._trigger_tire_capture()
+            return
+
+    def _compute_face_tire_yaw(self) -> Optional[float]:
+        """Compute target yaw to face the current tire center."""
+        pose = self._get_current_pose()
+        if pose is None:
+            return None
+        tire_box = self._last_tire_box
+        if tire_box is None:
+            return yaw_from_quaternion(pose.pose.orientation)
+        center_x = (tire_box.xmin + tire_box.xmax) / 2.0
+        center_y = (tire_box.ymin + tire_box.ymax) / 2.0
+        dx = center_x - pose.pose.position.x
+        dy = center_y - pose.pose.position.y
+        if math.hypot(dx, dy) < 0.01:
+            return yaw_from_quaternion(pose.pose.orientation)
+        return math.atan2(dy, dx)
+
+    def _dispatch_face_tire_goal(self) -> str:
+        """Rotate in place to face the tire before capture. Returns: sent | capture | failed."""
+        if self.get_parameter("require_nav_permitted").value and self._nav_permitted is not True:
             self._mission_log_append(
-                "photo_trigger_distance_check",
+                "nav_gate_blocked_dispatch",
+                {
+                    "state": self.current_state,
+                    "nav_permitted": self._nav_permitted,
+                    "last_nav_permitted_time": self._last_nav_permitted_time,
+                    "topic": self.get_parameter("nav_permitted_topic").value,
+                },
+                sync=True,
+            )
+            return "failed"
+        target_yaw = self._compute_face_tire_yaw()
+        if target_yaw is None:
+            self.get_logger().warn("Face tire: cannot compute target yaw.")
+            self._mission_log_append(
+                "face_tire_failed",
+                {"reason": "target_yaw_unavailable", "state": self.current_state},
+                sync=True,
+            )
+            return "failed"
+        current_yaw = self._get_current_yaw()
+        tol = float(self.get_parameter("face_tire_yaw_tolerance").value)
+        if current_yaw is not None:
+            yaw_diff = abs(math.atan2(math.sin(target_yaw - current_yaw), math.cos(target_yaw - current_yaw)))
+            if yaw_diff <= tol:
+                self._mission_log_append(
+                    "face_tire_aligned",
+                    {"yaw_diff": yaw_diff, "tolerance": tol},
+                    sync=True,
+                )
+                self._trigger_tire_capture()
+                return "capture"
+        pose_map = self._get_current_pose_in_map_frame()
+        if pose_map is None:
+            self.get_logger().warn("Face tire: cannot get pose in map frame.")
+            return "failed"
+        map_frame = self.get_parameter("map_frame").value
+        if pose_map.header.frame_id != map_frame and self.get_parameter("require_goal_transform").value:
+            self.get_logger().warn(
+                f"Face tire: pose frame {pose_map.header.frame_id} != {map_frame}; cannot dispatch."
+            )
+            return "failed"
+        goal = PoseStamped()
+        goal.header.frame_id = map_frame if pose_map.header.frame_id == map_frame else pose_map.header.frame_id
+        goal.header.stamp = self.get_clock().now().to_msg()
+        goal.pose.position = pose_map.pose.position
+        goal.pose.orientation = quaternion_from_yaw(target_yaw)
+        if self._is_dry_run():
+            self.get_logger().info("Dry run: face_tire rotation validated, not sending to Nav2")
+            self._trigger_tire_capture()
+            return "capture"
+        if send_nav_goal(self, goal, self._on_face_tire_done):
+            self._face_tire_start_time = time.time()
+            self._face_tire_target_yaw = target_yaw
+            self._mission_log_append(
+                "face_tire_dispatched",
+                {"yaw_deg": math.degrees(target_yaw), "frame": goal.header.frame_id},
+                sync=True,
+            )
+            return "sent"
+        self.get_logger().warn("Face tire: Nav2 goal dispatch failed.")
+        return "failed"
+
+    def _trigger_tire_capture(self) -> None:
+        """Trigger photo capture after tire approach (with distance gate)."""
+        trigger_threshold = float(self.get_parameter("photo_trigger_distance").value)
+        distance_to_goal = None
+        if self._current_goal_pose is not None:
+            pose_map = self._get_current_pose_in_map_frame()
+            if pose_map is not None:
+                dx = pose_map.pose.position.x - self._current_goal_pose.pose.position.x
+                dy = pose_map.pose.position.y - self._current_goal_pose.pose.position.y
+                distance_to_goal = math.sqrt(dx * dx + dy * dy)
+        self._mission_log_append(
+            "photo_trigger_distance_check",
+            {
+                "distance_to_goal": distance_to_goal,
+                "threshold": trigger_threshold,
+                "state": self.current_state,
+            },
+            sync=True,
+        )
+        if not should_trigger_photo(distance_to_goal, trigger_threshold):
+            self.get_logger().error(
+                f"Photo trigger blocked: distance_to_goal={distance_to_goal} > threshold={trigger_threshold}"
+            )
+            self._mission_log_append(
+                "photo_trigger_blocked",
                 {
                     "distance_to_goal": distance_to_goal,
                     "threshold": trigger_threshold,
@@ -1978,35 +2587,50 @@ class VehicleInspectionManager(Node):
                 },
                 sync=True,
             )
-            if not should_trigger_photo(distance_to_goal, trigger_threshold):
-                self.get_logger().error(
-                    f"Photo trigger blocked: distance_to_goal={distance_to_goal} > threshold={trigger_threshold}"
-                )
-                self._mission_log_append(
-                    "photo_trigger_blocked",
-                    {
-                        "distance_to_goal": distance_to_goal,
-                        "threshold": trigger_threshold,
-                        "state": self.current_state,
-                    },
-                    sync=True,
-                )
-                self._set_state(MissionState.WAIT_TIRE_BOX, cause="photo_trigger_distance")
-                return
-            if self._tire_registry:
-                self._tire_registry[-1]["visited"] = True
-            self._current_goal_pose = None
-            tire_class = self.get_parameter("tire_label").value
-            tire_position = (self._tire_registry[-1].get("tire_position", "")) if self._tire_registry else ""
-            self._publish_capture_metadata(tire_class, tire_position)
-            self._total_tires_captured += 1
-            self._capture_retry_count = 0
-            self._verify_capture_start_time = time.time()
-            photo_msg = Bool()
-            photo_msg.data = True
-            self.photo_capture_pub.publish(photo_msg)
-            self.get_logger().info(f"Photo capture triggered for tire {self._total_tires_captured}; entering VERIFY_CAPTURE")
-            self._set_state(MissionState.VERIFY_CAPTURE, cause="photo_triggered")
+            self._set_state(MissionState.WAIT_TIRE_BOX, cause="photo_trigger_distance")
+            return
+        if self._tire_registry:
+            self._tire_registry[-1]["visited"] = True
+        self._current_goal_pose = None
+        tire_class = self.get_parameter("tire_label").value
+        tire_position = (self._tire_registry[-1].get("tire_position", "")) if self._tire_registry else ""
+        self._publish_capture_metadata(tire_class, tire_position)
+        self._total_tires_captured += 1
+        self._capture_retry_count = 0
+        self._verify_capture_start_time = time.time()
+        photo_msg = Bool()
+        photo_msg.data = True
+        self.photo_capture_pub.publish(photo_msg)
+        self.get_logger().info(f"Photo capture triggered for tire {self._total_tires_captured}; entering VERIFY_CAPTURE")
+        self._set_state(MissionState.VERIFY_CAPTURE, cause="photo_triggered")
+
+    def _on_face_tire_done(self, future):
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self.get_logger().error("Face tire goal rejected.")
+            self._mission_log_append("nav_rejected", {"goal": "face_tire"}, sync=True)
+            self._set_state(MissionState.WAIT_TIRE_BOX, cause="face_tire_rejected")
+            return
+        self._active_nav_goal_handle = goal_handle
+        result_future = goal_handle.get_result_async()
+        result_future.add_done_callback(self._on_face_tire_result)
+
+    def _on_face_tire_result(self, future):
+        self._active_nav_goal_handle = None
+        status = future.result().status
+        nav_succeeded = status == 4
+        self._mission_log_append(
+            "face_tire_result",
+            {"status": int(status), "success": nav_succeeded},
+            sync=True,
+        )
+        self._face_tire_start_time = None
+        self._face_tire_target_yaw = None
+        if not nav_succeeded:
+            self.get_logger().warn("Face tire rotation failed; returning to WAIT_TIRE_BOX.")
+            self._set_state(MissionState.WAIT_TIRE_BOX, cause="face_tire_failed")
+            return
+        self._trigger_tire_capture()
 
     def _on_rotation_done_vehicle(self, future):
         goal_handle = future.result()
@@ -2052,6 +2676,26 @@ class VehicleInspectionManager(Node):
         # Return to waiting for tire box
         self._set_state(MissionState.WAIT_TIRE_BOX)
 
+    def _on_patrol_done(self, future):
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self.get_logger().warn("Patrol goal rejected; returning to SEARCH_VEHICLE.")
+            self._set_state(MissionState.SEARCH_VEHICLE, cause="patrol_rejected")
+            return
+        self._active_nav_goal_handle = goal_handle
+        result_future = goal_handle.get_result_async()
+        result_future.add_done_callback(self._on_patrol_result)
+
+    def _on_patrol_result(self, future):
+        self._active_nav_goal_handle = None
+        status = future.result().status
+        self.get_logger().info(f"Patrol result status: {status}")
+        pause_s = float(self.get_parameter("patrol_pause_s").value)
+        if pause_s > 0:
+            time.sleep(pause_s)
+        self.wait_start_time = time.time()
+        self._set_state(MissionState.SEARCH_VEHICLE, cause="patrol_complete")
+
     def _on_rotation_done_search(self, future):
         goal_handle = future.result()
         if not goal_handle.accepted:
@@ -2059,7 +2703,7 @@ class VehicleInspectionManager(Node):
             self._mission_log_append("nav_rejected", {"goal": "rotation_search"}, sync=True)
             self._mission_report["error_states_encountered"] += 1
             self._publish_mission_report()
-            self._set_state(MissionState.DONE)
+            self._set_state(MissionState.DONE, cause="rotation_search_rejected")
             return
         self._active_nav_goal_handle = goal_handle
         result_future = goal_handle.get_result_async()
@@ -2070,7 +2714,7 @@ class VehicleInspectionManager(Node):
         status = future.result().status
         self.get_logger().info(f"Search rotation result status: {status}")
         self.wait_start_time = time.time()
-        self._set_state(MissionState.SEARCH_VEHICLE)
+        self._set_state(MissionState.SEARCH_VEHICLE, cause="rotation_search_complete")
 
     # ----------------------- Helpers ----------------------- #
     def _pose_from_truck(self, truck: dict, standoff: float, yaw: float) -> PoseStamped:
