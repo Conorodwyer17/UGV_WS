@@ -116,3 +116,13 @@ This map captures the current local ROS 2 workspace structure, package entrypoin
 - `jetson_release` utility missing.
 - no integrated CI workflow file identified at top-level during this initial pass.
 - large mission/perception code exists, but explicit unified object-manager service API and tire frame persistence contract still need formalization for P0 acceptance.
+
+## Refresh Notes (2026-02-28)
+
+- Additional local prototype nodes now exist under `nodes/`:
+  - `nodes/esp32_bridge/esp32_serial_bridge_node.py`
+  - `nodes/object_manager/demo_object_manager_node.py`
+- Captured live Aurora/ESP32 artifacts and demo evidence are stored under:
+  - `research/data/aurora_samples/`
+  - `research/data/esp32_odometry/`
+  - `research/demos/`

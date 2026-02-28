@@ -77,12 +77,30 @@ timeout 4 ros2 topic echo /tf | rg object_1
 ## Artifact Index
 
 - Environment inventory: `research/snapshots/conor-desktop_2026-02-28T00-47-07+00-00.txt`
+- Refresh inventory: `research/snapshots/conor-desktop_2026-02-28T01-15-46+00-00.txt`
 - Code map: `docs/code_map.md`
 - Commands/failures/progress logs: `research/logs/`
 - Aurora manifests and bag infos: `research/data/aurora_samples/`
 - ESP32 telemetry captures: `research/data/esp32_odometry/`
 - Object manager evidence: `research/demos/`
 - External resources index: `docs/resources_dump.csv`, `docs/resources_dump.json`
+
+## Minimal Detector -> Tracker -> Object Demo
+
+```bash
+source /opt/ros/humble/setup.bash
+source ~/ugv_ws/install/setup.bash
+
+python3 ~/ugv_ws/nodes/detector/demo_detector_node.py
+python3 ~/ugv_ws/nodes/tracker/demo_tracker_node.py
+python3 ~/ugv_ws/nodes/object_manager/demo_object_manager_node.py --ros-args -p input_topic:=/demo/tracks_3d
+
+timeout 6 ros2 topic echo /tf > ~/ugv_ws/research/demos/tf_stream_object_demo_20260228_0119.txt
+```
+
+Evidence file containing object frames:
+
+- `research/demos/object_tf_evidence_20260228_0119.txt`
 
 ## Known Gaps (Immediate Next P0)
 
