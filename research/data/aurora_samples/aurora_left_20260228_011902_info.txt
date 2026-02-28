@@ -1,0 +1,2 @@
+
+Could not find metadata in bag directory research/data/aurora_samples/aurora_left_20260228_011902

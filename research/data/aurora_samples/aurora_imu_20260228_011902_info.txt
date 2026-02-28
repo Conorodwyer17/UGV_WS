@@ -1,0 +1,10 @@
+
+Files:             aurora_imu_20260228_011902_0.db3
+Bag size:          425.0 KiB
+Storage id:        sqlite3
+Duration:          3.310331157s
+Start:             Feb 28 2026 01:19:20.220493709 (1772241560.220493709)
+End:               Feb 28 2026 01:19:23.530824866 (1772241563.530824866)
+Messages:          1038
+Topic information: Topic: /slamware_ros_sdk_server_node/imu_raw_data | Type: sensor_msgs/msg/Imu | Count: 1038 | Serialization Format: cdr
+

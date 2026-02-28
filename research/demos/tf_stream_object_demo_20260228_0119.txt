@@ -1,0 +1,3060 @@
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 2672160
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03841440752148628
+      y: -0.035267043858766556
+      z: 0.03646734356880188
+    rotation:
+      x: 0.025462444871664047
+      y: 0.057400159537792206
+      z: 0.3356703519821167
+      w: 0.9398841857910156
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 6964440
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.038386765867471695
+      y: -0.03523321822285652
+      z: 0.03647823631763458
+    rotation:
+      x: 0.02541922964155674
+      y: 0.057448334991931915
+      z: 0.3354453444480896
+      w: 0.9399628043174744
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241609
+      nanosec: 960019052
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03838949650526047
+      y: -0.03522805497050285
+      z: 0.03647422417998314
+    rotation:
+      x: 0.025443270802497864
+      y: 0.05746087431907654
+      z: 0.33542966842651367
+      w: 0.9399669170379639
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241609
+      nanosec: 961780516
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.038386765867471695
+      y: -0.03523321822285652
+      z: 0.03647823631763458
+    rotation:
+      x: 0.02541922964155674
+      y: 0.057448334991931915
+      z: 0.3354453444480896
+      w: 0.9399628043174744
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 62684443
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.038386765867471695
+      y: -0.03523321822285652
+      z: 0.03647823631763458
+    rotation:
+      x: 0.02541922964155674
+      y: 0.057448334991931915
+      z: 0.3354453444480896
+      w: 0.9399628043174744
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 64380081
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03841440752148628
+      y: -0.035267043858766556
+      z: 0.03646734356880188
+    rotation:
+      x: 0.025462444871664047
+      y: 0.057400159537792206
+      z: 0.3356703519821167
+      w: 0.9398841857910156
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 102674893
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.038388751447200775
+      y: -0.035266440361738205
+      z: 0.03645554557442665
+    rotation:
+      x: 0.025522366166114807
+      y: 0.057265669107437134
+      z: 0.3356829285621643
+      w: 0.9398863315582275
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 106970630
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.038386765867471695
+      y: -0.03523321822285652
+      z: 0.03647823631763458
+    rotation:
+      x: 0.02541922964155674
+      y: 0.057448334991931915
+      z: 0.3354453444480896
+      w: 0.9399628043174744
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 162673448
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03841657564043999
+      y: -0.035271190106868744
+      z: 0.03646775335073471
+    rotation:
+      x: 0.025386229157447815
+      y: 0.05729105323553085
+      z: 0.3355812430381775
+      w: 0.9399247765541077
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 164381215
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.0384238064289093
+      y: -0.03527242690324783
+      z: 0.036470927298069
+    rotation:
+      x: 0.025350868701934814
+      y: 0.05729764699935913
+      z: 0.335554838180542
+      w: 0.9399347305297852
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 202681115
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.0384238064289093
+      y: -0.03527242690324783
+      z: 0.036470927298069
+    rotation:
+      x: 0.025350868701934814
+      y: 0.05729764699935913
+      z: 0.335554838180542
+      w: 0.9399347305297852
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 206972339
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03841657564043999
+      y: -0.035271190106868744
+      z: 0.03646775335073471
+    rotation:
+      x: 0.025386229157447815
+      y: 0.05729105323553085
+      z: 0.3355812430381775
+      w: 0.9399247765541077
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 262672534
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03841657564043999
+      y: -0.035271190106868744
+      z: 0.03646775335073471
+    rotation:
+      x: 0.025386229157447815
+      y: 0.05729105323553085
+      z: 0.3355812430381775
+      w: 0.9399247765541077
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 264382092
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03835169970989227
+      y: -0.03525272384285927
+      z: 0.036472972482442856
+    rotation:
+      x: 0.025397494435310364
+      y: 0.057445138692855835
+      z: 0.3357851505279541
+      w: 0.9398422241210938
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 305240234
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.038326069712638855
+      y: -0.03521580249071121
+      z: 0.03650937229394913
+    rotation:
+      x: 0.025496765971183777
+      y: 0.05754023790359497
+      z: 0.3355843722820282
+      w: 0.9399054050445557
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 306968513
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03841657564043999
+      y: -0.035271190106868744
+      z: 0.03646775335073471
+    rotation:
+      x: 0.025386229157447815
+      y: 0.05729105323553085
+      z: 0.3355812430381775
+      w: 0.9399247765541077
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 362673027
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.038409218192100525
+      y: -0.035234253853559494
+      z: 0.036471132189035416
+    rotation:
+      x: 0.02534034289419651
+      y: 0.05729294195771217
+      z: 0.33550044894218445
+      w: 0.9399546980857849
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 364383834
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03843139484524727
+      y: -0.03523917496204376
+      z: 0.03646092489361763
+    rotation:
+      x: 0.025298625230789185
+      y: 0.057226985692977905
+      z: 0.3354780972003937
+      w: 0.9399678707122803
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 409941942
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03847094997763634
+      y: -0.03523753583431244
+      z: 0.03645244240760803
+    rotation:
+      x: 0.025158479809761047
+      y: 0.05740359425544739
+      z: 0.3354717493057251
+      w: 0.939963161945343
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 410595230
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.038409218192100525
+      y: -0.035234253853559494
+      z: 0.036471132189035416
+    rotation:
+      x: 0.02534034289419651
+      y: 0.05729294195771217
+      z: 0.33550044894218445
+      w: 0.9399546980857849
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 462742290
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.038409218192100525
+      y: -0.035234253853559494
+      z: 0.036471132189035416
+    rotation:
+      x: 0.02534034289419651
+      y: 0.05729294195771217
+      z: 0.33550044894218445
+      w: 0.9399546980857849
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 464382279
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03847094997763634
+      y: -0.03523753583431244
+      z: 0.03645244240760803
+    rotation:
+      x: 0.025158479809761047
+      y: 0.05740359425544739
+      z: 0.3354717493057251
+      w: 0.939963161945343
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 509945763
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03846486285328865
+      y: -0.03528584539890289
+      z: 0.036436233669519424
+    rotation:
+      x: 0.02527064085006714
+      y: 0.05721765756607056
+      z: 0.3355642557144165
+      w: 0.9399384260177612
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 510613740
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.038409218192100525
+      y: -0.035234253853559494
+      z: 0.036471132189035416
+    rotation:
+      x: 0.02534034289419651
+      y: 0.05729294195771217
+      z: 0.33550044894218445
+      w: 0.9399546980857849
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 411460234
+    frame_id: map
+  child_frame_id: object_1
+  transform:
+    translation:
+      x: 1.5
+      y: 1.5
+      z: 0.5
+    rotation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 562743999
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03845081105828285
+      y: -0.035276804119348526
+      z: 0.036440685391426086
+    rotation:
+      x: 0.025259755551815033
+      y: 0.05733206495642662
+      z: 0.33554208278656006
+      w: 0.9399397373199463
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 564490806
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03844703733921051
+      y: -0.03527437523007393
+      z: 0.03644188120961189
+    rotation:
+      x: 0.025256827473640442
+      y: 0.05736282467842102
+      z: 0.33553609251976013
+      w: 0.9399399757385254
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 610549881
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03843942657113075
+      y: -0.035278260707855225
+      z: 0.036446791142225266
+    rotation:
+      x: 0.025180652737617493
+      y: 0.05746886134147644
+      z: 0.33570489287376404
+      w: 0.9398753046989441
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 611794153
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03845081105828285
+      y: -0.035276804119348526
+      z: 0.036440685391426086
+    rotation:
+      x: 0.025259755551815033
+      y: 0.05733206495642662
+      z: 0.33554208278656006
+      w: 0.9399397373199463
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 612151950
+    frame_id: map
+  child_frame_id: object_1
+  transform:
+    translation:
+      x: 1.5
+      y: 1.5
+      z: 0.5
+    rotation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 662744173
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03845081105828285
+      y: -0.035276804119348526
+      z: 0.036440685391426086
+    rotation:
+      x: 0.025259755551815033
+      y: 0.05733206495642662
+      z: 0.33554208278656006
+      w: 0.9399397373199463
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 664495172
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03843942657113075
+      y: -0.035278260707855225
+      z: 0.036446791142225266
+    rotation:
+      x: 0.025180652737617493
+      y: 0.05746886134147644
+      z: 0.33570489287376404
+      w: 0.9398753046989441
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 710550566
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.038454197347164154
+      y: -0.03529208153486252
+      z: 0.03642509505152702
+    rotation:
+      x: 0.025512561202049255
+      y: 0.05734243988990784
+      z: 0.3355785310268402
+      w: 0.9399191737174988
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 711793623
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03845081105828285
+      y: -0.035276804119348526
+      z: 0.036440685391426086
+    rotation:
+      x: 0.025259755551815033
+      y: 0.05733206495642662
+      z: 0.33554208278656006
+      w: 0.9399397373199463
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 762747834
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.0384574756026268
+      y: -0.03526174649596214
+      z: 0.03642692044377327
+    rotation:
+      x: 0.025253035128116608
+      y: 0.05727798491716385
+      z: 0.3355461359024048
+      w: 0.9399416446685791
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 764550450
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.038458388298749924
+      y: -0.03525334596633911
+      z: 0.03642742335796356
+    rotation:
+      x: 0.02518114633858204
+      y: 0.05726012960076332
+      z: 0.33553722500801086
+      w: 0.9399479031562805
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 811489472
+    frame_id: map
+  child_frame_id: object_1
+  transform:
+    translation:
+      x: 1.5
+      y: 1.5
+      z: 0.5
+    rotation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 829353773
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03845503181219101
+      y: -0.0352356992661953
+      z: 0.03644734248518944
+    rotation:
+      x: 0.024930894374847412
+      y: 0.05727463960647583
+      z: 0.33550316095352173
+      w: 0.9399657845497131
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 830301881
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.0384574756026268
+      y: -0.03526174649596214
+      z: 0.03642692044377327
+    rotation:
+      x: 0.025253035128116608
+      y: 0.05727798491716385
+      z: 0.3355461359024048
+      w: 0.9399416446685791
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 862749224
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.0384574756026268
+      y: -0.03526174649596214
+      z: 0.03642692044377327
+    rotation:
+      x: 0.025253035128116608
+      y: 0.05727798491716385
+      z: 0.3355461359024048
+      w: 0.9399416446685791
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 864555328
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03845503181219101
+      y: -0.0352356992661953
+      z: 0.03644734248518944
+    rotation:
+      x: 0.024930894374847412
+      y: 0.05727463960647583
+      z: 0.33550316095352173
+      w: 0.9399657845497131
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 929390043
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03844446688890457
+      y: -0.03525012731552124
+      z: 0.03644805774092674
+    rotation:
+      x: 0.025035515427589417
+      y: 0.057346194982528687
+      z: 0.335582435131073
+      w: 0.9399304389953613
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 932104511
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.038255006074905396
+      y: -0.03553219139575958
+      z: 0.036363594233989716
+    rotation:
+      x: 0.02507607638835907
+      y: 0.05729895085096359
+      z: 0.33568790555000305
+      w: 0.9398945569992065
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 964338474
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.038255006074905396
+      y: -0.03553219139575958
+      z: 0.036363594233989716
+    rotation:
+      x: 0.02507607638835907
+      y: 0.05729895085096359
+      z: 0.33568790555000305
+      w: 0.9398945569992065
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241610
+      nanosec: 965608667
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03819997236132622
+      y: -0.035614173859357834
+      z: 0.036339059472084045
+    rotation:
+      x: 0.025087863206863403
+      y: 0.05728521943092346
+      z: 0.3357185125350952
+      w: 0.9398840665817261
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 13427285
+    frame_id: map
+  child_frame_id: object_1
+  transform:
+    translation:
+      x: 1.5
+      y: 1.5
+      z: 0.5
+    rotation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 29453610
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.038511551916599274
+      y: -0.03552102670073509
+      z: 0.036536261439323425
+    rotation:
+      x: 0.02529841661453247
+      y: 0.0573766827583313
+      z: 0.33568698167800903
+      w: 0.9398841261863708
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 32129326
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.038255006074905396
+      y: -0.03553219139575958
+      z: 0.036363594233989716
+    rotation:
+      x: 0.02507607638835907
+      y: 0.05729895085096359
+      z: 0.33568790555000305
+      w: 0.9398945569992065
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 65003907
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.038255006074905396
+      y: -0.03553219139575958
+      z: 0.036363594233989716
+    rotation:
+      x: 0.02507607638835907
+      y: 0.05729895085096359
+      z: 0.33568790555000305
+      w: 0.9398945569992065
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 80327727
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03811559081077576
+      y: -0.035186756402254105
+      z: 0.036341749131679535
+    rotation:
+      x: 0.025102080777287483
+      y: 0.057374898344278336
+      z: 0.33554038405418396
+      w: 0.9399418830871582
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 129463005
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03811559081077576
+      y: -0.035186756402254105
+      z: 0.036341749131679535
+    rotation:
+      x: 0.025102080777287483
+      y: 0.057374898344278336
+      z: 0.33554038405418396
+      w: 0.9399418830871582
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 132129952
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.037364281713962555
+      y: -0.03542418032884598
+      z: 0.035893913358449936
+    rotation:
+      x: 0.024983566254377365
+      y: 0.0571613684296608
+      z: 0.3357681632041931
+      w: 0.9398767352104187
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 165005494
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.037364281713962555
+      y: -0.03542418032884598
+      z: 0.035893913358449936
+    rotation:
+      x: 0.024983566254377365
+      y: 0.0571613684296608
+      z: 0.3357681632041931
+      w: 0.9398767352104187
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 180323265
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03715531900525093
+      y: -0.03549014776945114
+      z: 0.035769443958997726
+    rotation:
+      x: 0.024950610473752022
+      y: 0.05710199847817421
+      z: 0.33583152294158936
+      w: 0.9398585557937622
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 211496320
+    frame_id: map
+  child_frame_id: object_1
+  transform:
+    translation:
+      x: 1.5
+      y: 1.5
+      z: 0.5
+    rotation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 229460687
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03805305436253548
+      y: -0.035189345479011536
+      z: 0.036111149936914444
+    rotation:
+      x: 0.02538609504699707
+      y: 0.057208895683288574
+      z: 0.33565324544906616
+      w: 0.9399040341377258
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 232133651
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.037364281713962555
+      y: -0.03542418032884598
+      z: 0.035893913358449936
+    rotation:
+      x: 0.024983566254377365
+      y: 0.0571613684296608
+      z: 0.3357681632041931
+      w: 0.9398767352104187
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 265013384
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.037364281713962555
+      y: -0.03542418032884598
+      z: 0.035893913358449936
+    rotation:
+      x: 0.024983566254377365
+      y: 0.0571613684296608
+      z: 0.3357681632041931
+      w: 0.9398767352104187
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 281921321
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.038602445274591446
+      y: -0.034614428877830505
+      z: 0.03629805147647858
+    rotation:
+      x: 0.025169402360916138
+      y: 0.05718699097633362
+      z: 0.33538299798965454
+      w: 0.940007746219635
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 310469317
+    frame_id: map
+  child_frame_id: object_1
+  transform:
+    translation:
+      x: 1.5
+      y: 1.5
+      z: 0.5
+    rotation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 329466209
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03824995458126068
+      y: -0.035246673971414566
+      z: 0.03632546216249466
+    rotation:
+      x: 0.02525430917739868
+      y: 0.0572243332862854
+      z: 0.3356297016143799
+      w: 0.9399150609970093
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 332861711
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03832520544528961
+      y: -0.03511171415448189
+      z: 0.036319613456726074
+    rotation:
+      x: 0.025236187502741814
+      y: 0.05721636861562729
+      z: 0.3355770409107208
+      w: 0.9399349093437195
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 365010106
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03832520544528961
+      y: -0.03511171415448189
+      z: 0.036319613456726074
+    rotation:
+      x: 0.025236187502741814
+      y: 0.05721636861562729
+      z: 0.3355770409107208
+      w: 0.9399349093437195
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 381912315
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03824995458126068
+      y: -0.035246673971414566
+      z: 0.03632546216249466
+    rotation:
+      x: 0.02525430917739868
+      y: 0.0572243332862854
+      z: 0.3356297016143799
+      w: 0.9399150609970093
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 411521477
+    frame_id: map
+  child_frame_id: object_1
+  transform:
+    translation:
+      x: 1.5
+      y: 1.5
+      z: 0.5
+    rotation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 429675959
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03762056678533554
+      y: -0.03538965433835983
+      z: 0.03620331361889839
+    rotation:
+      x: 0.02512441575527191
+      y: 0.057357847690582275
+      z: 0.33588531613349915
+      w: 0.9398190975189209
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 432862305
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03832520544528961
+      y: -0.03511171415448189
+      z: 0.036319613456726074
+    rotation:
+      x: 0.025236187502741814
+      y: 0.05721636861562729
+      z: 0.3355770409107208
+      w: 0.9399349093437195
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 465082894
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03832520544528961
+      y: -0.03511171415448189
+      z: 0.036319613456726074
+    rotation:
+      x: 0.025236187502741814
+      y: 0.05721636861562729
+      z: 0.3355770409107208
+      w: 0.9399349093437195
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 481918734
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.037959009408950806
+      y: -0.03525497391819954
+      z: 0.03639346733689308
+    rotation:
+      x: 0.025135207921266556
+      y: 0.05736205726861954
+      z: 0.33564847707748413
+      w: 0.939903199672699
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 512968651
+    frame_id: map
+  child_frame_id: object_1
+  transform:
+    translation:
+      x: 1.5
+      y: 1.5
+      z: 0.5
+    rotation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 530000301
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03806878253817558
+      y: -0.03498420491814613
+      z: 0.036312371492385864
+    rotation:
+      x: 0.024934113025665283
+      y: 0.05737859010696411
+      z: 0.335534930229187
+      w: 0.9399480819702148
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 532860243
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.038045722991228104
+      y: -0.035041119903326035
+      z: 0.03632942959666252
+    rotation:
+      x: 0.02497638203203678
+      y: 0.057375118136405945
+      z: 0.33555880188941956
+      w: 0.9399386644363403
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 565014687
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.038045722991228104
+      y: -0.035041119903326035
+      z: 0.03632942959666252
+    rotation:
+      x: 0.02497638203203678
+      y: 0.057375118136405945
+      z: 0.33555880188941956
+      w: 0.9399386644363403
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 581919296
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03806878253817558
+      y: -0.03498420491814613
+      z: 0.036312371492385864
+    rotation:
+      x: 0.024934113025665283
+      y: 0.05737859010696411
+      z: 0.335534930229187
+      w: 0.9399480819702148
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 611420744
+    frame_id: map
+  child_frame_id: object_1
+  transform:
+    translation:
+      x: 1.5
+      y: 1.5
+      z: 0.5
+    rotation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 632707651
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.037901826202869415
+      y: -0.03505181893706322
+      z: 0.03632892295718193
+    rotation:
+      x: 0.02505737543106079
+      y: 0.05750417709350586
+      z: 0.33565980195999146
+      w: 0.9398925304412842
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 633634288
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.038045722991228104
+      y: -0.035041119903326035
+      z: 0.03632942959666252
+    rotation:
+      x: 0.02497638203203678
+      y: 0.057375118136405945
+      z: 0.33555880188941956
+      w: 0.9399386644363403
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 665015793
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.038045722991228104
+      y: -0.035041119903326035
+      z: 0.03632942959666252
+    rotation:
+      x: 0.02497638203203678
+      y: 0.057375118136405945
+      z: 0.33555880188941956
+      w: 0.9399386644363403
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 681919666
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03744153305888176
+      y: -0.03501907363533974
+      z: 0.03617095947265625
+    rotation:
+      x: 0.02499549090862274
+      y: 0.05720880627632141
+      z: 0.33548271656036377
+      w: 0.939975380897522
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 710461966
+    frame_id: map
+  child_frame_id: object_1
+  transform:
+    translation:
+      x: 1.5
+      y: 1.5
+      z: 0.5
+    rotation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 735964289
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03744153305888176
+      y: -0.03501907363533974
+      z: 0.03617095947265625
+    rotation:
+      x: 0.02499549090862274
+      y: 0.05720880627632141
+      z: 0.33548271656036377
+      w: 0.939975380897522
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 736466408
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03786814212799072
+      y: -0.03510250896215439
+      z: 0.036326296627521515
+    rotation:
+      x: 0.025071382522583008
+      y: 0.05728698521852493
+      z: 0.3355432450771332
+      w: 0.9399470090866089
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 765039012
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03786814212799072
+      y: -0.03510250896215439
+      z: 0.036326296627521515
+    rotation:
+      x: 0.025071382522583008
+      y: 0.05728698521852493
+      z: 0.3355432450771332
+      w: 0.9399470090866089
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 781922404
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03797704726457596
+      y: -0.035123784095048904
+      z: 0.036365918815135956
+    rotation:
+      x: 0.02509075403213501
+      y: 0.05730694532394409
+      z: 0.3355587124824524
+      w: 0.9399397969245911
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 811511246
+    frame_id: map
+  child_frame_id: object_1
+  transform:
+    translation:
+      x: 1.5
+      y: 1.5
+      z: 0.5
+    rotation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 836556251
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03823048621416092
+      y: -0.03589634224772453
+      z: 0.0367075651884079
+    rotation:
+      x: 0.024947207421064377
+      y: 0.0576108917593956
+      z: 0.3358273208141327
+      w: 0.9398289918899536
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 837447303
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03786814212799072
+      y: -0.03510250896215439
+      z: 0.036326296627521515
+    rotation:
+      x: 0.025071382522583008
+      y: 0.05728698521852493
+      z: 0.3355432450771332
+      w: 0.9399470090866089
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 865031894
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03786814212799072
+      y: -0.03510250896215439
+      z: 0.036326296627521515
+    rotation:
+      x: 0.025071382522583008
+      y: 0.05728698521852493
+      z: 0.3355432450771332
+      w: 0.9399470090866089
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 889319033
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03818895295262337
+      y: -0.03552239388227463
+      z: 0.036397673189640045
+    rotation:
+      x: 0.02532351016998291
+      y: 0.05732583999633789
+      z: 0.335673063993454
+      w: 0.9398915767669678
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 910452018
+    frame_id: map
+  child_frame_id: object_1
+  transform:
+    translation:
+      x: 1.5
+      y: 1.5
+      z: 0.5
+    rotation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 946243310
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.037626735866069794
+      y: -0.0350208543241024
+      z: 0.03615272045135498
+    rotation:
+      x: 0.025304734706878662
+      y: 0.05708962678909302
+      z: 0.3355700373649597
+      w: 0.939943253993988
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 946746869
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03821835294365883
+      y: -0.035786934196949005
+      z: 0.03661685064435005
+    rotation:
+      x: 0.02505732700228691
+      y: 0.05752747878432274
+      z: 0.3357822000980377
+      w: 0.9398473501205444
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 965040296
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03821835294365883
+      y: -0.035786934196949005
+      z: 0.03661685064435005
+    rotation:
+      x: 0.02505732700228691
+      y: 0.05752747878432274
+      z: 0.3357822000980377
+      w: 0.9398473501205444
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241611
+      nanosec: 989394092
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.037626735866069794
+      y: -0.0350208543241024
+      z: 0.03615272045135498
+    rotation:
+      x: 0.025304734706878662
+      y: 0.05708962678909302
+      z: 0.3355700373649597
+      w: 0.939943253993988
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 11497683
+    frame_id: map
+  child_frame_id: object_1
+  transform:
+    translation:
+      x: 1.5
+      y: 1.5
+      z: 0.5
+    rotation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 47272944
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03788798302412033
+      y: -0.03507811576128006
+      z: 0.03632595017552376
+    rotation:
+      x: 0.025249555706977844
+      y: 0.05734136700630188
+      z: 0.3355717062950134
+      w: 0.9399288296699524
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 47613909
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03774596005678177
+      y: -0.035127151757478714
+      z: 0.036204591393470764
+    rotation:
+      x: 0.02530871331691742
+      y: 0.057139694690704346
+      z: 0.3355918824672699
+      w: 0.9399322867393494
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 65044478
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03774596005678177
+      y: -0.035127151757478714
+      z: 0.036204591393470764
+    rotation:
+      x: 0.02530871331691742
+      y: 0.057139694690704346
+      z: 0.3355918824672699
+      w: 0.9399322867393494
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 90467185
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.037373460829257965
+      y: -0.035028230398893356
+      z: 0.0361153781414032
+    rotation:
+      x: 0.025153473019599915
+      y: 0.05709183216094971
+      z: 0.3356115221977234
+      w: 0.9399323463439941
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 112610105
+    frame_id: map
+  child_frame_id: object_1
+  transform:
+    translation:
+      x: 1.5
+      y: 1.5
+      z: 0.5
+    rotation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 147276424
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03777046129107475
+      y: -0.03529246151447296
+      z: 0.036305204033851624
+    rotation:
+      x: 0.024902060627937317
+      y: 0.05723986029624939
+      z: 0.33561524748802185
+      w: 0.9399286508560181
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 147748206
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03768521919846535
+      y: -0.035235729068517685
+      z: 0.036264434456825256
+    rotation:
+      x: 0.024956047534942627
+      y: 0.05720807984471321
+      z: 0.33561447262763977
+      w: 0.9399295449256897
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 165048821
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03768521919846535
+      y: -0.035235729068517685
+      z: 0.036264434456825256
+    rotation:
+      x: 0.024956047534942627
+      y: 0.05720807984471321
+      z: 0.33561447262763977
+      w: 0.9399295449256897
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 190464328
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03777046129107475
+      y: -0.03529246151447296
+      z: 0.036305204033851624
+    rotation:
+      x: 0.024902060627937317
+      y: 0.05723986029624939
+      z: 0.33561524748802185
+      w: 0.9399286508560181
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 212360685
+    frame_id: map
+  child_frame_id: object_1
+  transform:
+    translation:
+      x: 1.5
+      y: 1.5
+      z: 0.5
+    rotation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 247387840
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03772733733057976
+      y: -0.03494656831026077
+      z: 0.0362192802131176
+    rotation:
+      x: 0.02533893473446369
+      y: 0.05708840861916542
+      z: 0.33562153577804565
+      w: 0.9399240016937256
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 247747365
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03768521919846535
+      y: -0.035235729068517685
+      z: 0.036264434456825256
+    rotation:
+      x: 0.024956047534942627
+      y: 0.05720807984471321
+      z: 0.33561447262763977
+      w: 0.9399295449256897
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 265051980
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03768521919846535
+      y: -0.035235729068517685
+      z: 0.036264434456825256
+    rotation:
+      x: 0.024956047534942627
+      y: 0.05720807984471321
+      z: 0.33561447262763977
+      w: 0.9399295449256897
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 290470847
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03750477731227875
+      y: -0.03467727452516556
+      z: 0.036134716123342514
+    rotation:
+      x: 0.02523772604763508
+      y: 0.05725327506661415
+      z: 0.33552607893943787
+      w: 0.9399507641792297
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 310419626
+    frame_id: map
+  child_frame_id: object_1
+  transform:
+    translation:
+      x: 1.5
+      y: 1.5
+      z: 0.5
+    rotation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 347394967
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03764863312244415
+      y: -0.03502187505364418
+      z: 0.03624406456947327
+    rotation:
+      x: 0.02501477301120758
+      y: 0.05740058422088623
+      z: 0.3356422185897827
+      w: 0.9399062395095825
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 347773308
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03761788085103035
+      y: -0.0349481962621212
+      z: 0.036220673471689224
+    rotation:
+      x: 0.02506243996322155
+      y: 0.05736909061670303
+      z: 0.33561742305755615
+      w: 0.9399157762527466
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 372546759
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03761788085103035
+      y: -0.0349481962621212
+      z: 0.036220673471689224
+    rotation:
+      x: 0.02506243996322155
+      y: 0.05736909061670303
+      z: 0.33561742305755615
+      w: 0.9399157762527466
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 390559608
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03764863312244415
+      y: -0.03502187505364418
+      z: 0.03624406456947327
+    rotation:
+      x: 0.02501477301120758
+      y: 0.05740058422088623
+      z: 0.3356422185897827
+      w: 0.9399062395095825
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 412710911
+    frame_id: map
+  child_frame_id: object_1
+  transform:
+    translation:
+      x: 1.5
+      y: 1.5
+      z: 0.5
+    rotation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 447394671
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.037605926394462585
+      y: -0.03500808775424957
+      z: 0.03622710332274437
+    rotation:
+      x: 0.02490219473838806
+      y: 0.05726686120033264
+      z: 0.33552515506744385
+      w: 0.9399591684341431
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 447773364
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03761788085103035
+      y: -0.0349481962621212
+      z: 0.036220673471689224
+    rotation:
+      x: 0.02506243996322155
+      y: 0.05736909061670303
+      z: 0.33561742305755615
+      w: 0.9399157762527466
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 472701664
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03761788085103035
+      y: -0.0349481962621212
+      z: 0.036220673471689224
+    rotation:
+      x: 0.02506243996322155
+      y: 0.05736909061670303
+      z: 0.33561742305755615
+      w: 0.9399157762527466
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 490557807
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03759130463004112
+      y: -0.03522667661309242
+      z: 0.03633541241288185
+    rotation:
+      x: 0.025288134813308716
+      y: 0.057439595460891724
+      z: 0.3356371819972992
+      w: 0.9398983716964722
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 510480601
+    frame_id: map
+  child_frame_id: object_1
+  transform:
+    translation:
+      x: 1.5
+      y: 1.5
+      z: 0.5
+    rotation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 550664081
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.0373823456466198
+      y: -0.035143494606018066
+      z: 0.036297690123319626
+    rotation:
+      x: 0.02532854676246643
+      y: 0.05744066834449768
+      z: 0.3356647789478302
+      w: 0.9398874044418335
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 552026435
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03742734342813492
+      y: -0.03516141697764397
+      z: 0.03630581498146057
+    rotation:
+      x: 0.025319842621684074
+      y: 0.057440437376499176
+      z: 0.33565884828567505
+      w: 0.9398897290229797
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 572736888
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03742734342813492
+      y: -0.03516141697764397
+      z: 0.03630581498146057
+    rotation:
+      x: 0.025319842621684074
+      y: 0.057440437376499176
+      z: 0.33565884828567505
+      w: 0.9398897290229797
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 590620167
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.0373823456466198
+      y: -0.035143494606018066
+      z: 0.036297690123319626
+    rotation:
+      x: 0.02532854676246643
+      y: 0.05744066834449768
+      z: 0.3356647789478302
+      w: 0.9398874044418335
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 611486909
+    frame_id: map
+  child_frame_id: object_1
+  transform:
+    translation:
+      x: 1.5
+      y: 1.5
+      z: 0.5
+    rotation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 650670056
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03758341819047928
+      y: -0.03419817239046097
+      z: 0.03712256997823715
+    rotation:
+      x: 0.02496422827243805
+      y: 0.05785152316093445
+      z: 0.33529940247535706
+      w: 0.9400023221969604
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 652021915
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03742734342813492
+      y: -0.03516141697764397
+      z: 0.03630581498146057
+    rotation:
+      x: 0.025319842621684074
+      y: 0.057440437376499176
+      z: 0.33565884828567505
+      w: 0.9398897290229797
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 672738799
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03742734342813492
+      y: -0.03516141697764397
+      z: 0.03630581498146057
+    rotation:
+      x: 0.025319842621684074
+      y: 0.057440437376499176
+      z: 0.33565884828567505
+      w: 0.9398897290229797
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 691638475
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03759273141622543
+      y: -0.03508427366614342
+      z: 0.03626376390457153
+    rotation:
+      x: 0.025284618139266968
+      y: 0.05742320418357849
+      z: 0.33552515506744385
+      w: 0.9399394989013672
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 710450087
+    frame_id: map
+  child_frame_id: object_1
+  transform:
+    translation:
+      x: 1.5
+      y: 1.5
+      z: 0.5
+    rotation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 763016420
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03776753693819046
+      y: -0.03497549891471863
+      z: 0.036228109151124954
+    rotation:
+      x: 0.025086330249905586
+      y: 0.05717376247048378
+      z: 0.33560338616371155
+      w: 0.9399320483207703
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 765390244
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03773155435919762
+      y: -0.034997884184122086
+      z: 0.03623546287417412
+    rotation:
+      x: 0.025127146393060684
+      y: 0.05722511187195778
+      z: 0.3355872631072998
+      w: 0.9399335980415344
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 772772807
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03773155435919762
+      y: -0.034997884184122086
+      z: 0.03623546287417412
+    rotation:
+      x: 0.025127146393060684
+      y: 0.05722511187195778
+      z: 0.3355872631072998
+      w: 0.9399335980415344
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 791632898
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03776753693819046
+      y: -0.03497549891471863
+      z: 0.036228109151124954
+    rotation:
+      x: 0.025086330249905586
+      y: 0.05717376247048378
+      z: 0.33560338616371155
+      w: 0.9399320483207703
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 811482123
+    frame_id: map
+  child_frame_id: object_1
+  transform:
+    translation:
+      x: 1.5
+      y: 1.5
+      z: 0.5
+    rotation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 863281407
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.037716422230005264
+      y: -0.035081952810287476
+      z: 0.03621920198202133
+    rotation:
+      x: 0.02506324276328087
+      y: 0.0571608766913414
+      z: 0.3356498181819916
+      w: 0.9399168491363525
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 868630182
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03773155435919762
+      y: -0.034997884184122086
+      z: 0.03623546287417412
+    rotation:
+      x: 0.025127146393060684
+      y: 0.05722511187195778
+      z: 0.3355872631072998
+      w: 0.9399335980415344
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 872782526
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03773155435919762
+      y: -0.034997884184122086
+      z: 0.03623546287417412
+    rotation:
+      x: 0.025127146393060684
+      y: 0.05722511187195778
+      z: 0.3355872631072998
+      w: 0.9399335980415344
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 891643962
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03758034110069275
+      y: -0.03502283990383148
+      z: 0.03619837388396263
+    rotation:
+      x: 0.0251094251871109
+      y: 0.057167619466781616
+      z: 0.3356020450592041
+      w: 0.9399323463439941
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 910424948
+    frame_id: map
+  child_frame_id: object_1
+  transform:
+    translation:
+      x: 1.5
+      y: 1.5
+      z: 0.5
+    rotation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 963280310
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.037534940987825394
+      y: -0.034995682537555695
+      z: 0.03623814135789871
+    rotation:
+      x: 0.024914339184761047
+      y: 0.05726549029350281
+      z: 0.3355788588523865
+      w: 0.9399398565292358
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 968623261
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03754429519176483
+      y: -0.035001277923583984
+      z: 0.036229945719242096
+    rotation:
+      x: 0.024954522028565407
+      y: 0.057245321571826935
+      z: 0.3355836272239685
+      w: 0.9399382472038269
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 972776341
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03754429519176483
+      y: -0.035001277923583984
+      z: 0.036229945719242096
+    rotation:
+      x: 0.024954522028565407
+      y: 0.057245321571826935
+      z: 0.3355836272239685
+      w: 0.9399382472038269
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241612
+      nanosec: 991641137
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.037534940987825394
+      y: -0.034995682537555695
+      z: 0.03623814135789871
+    rotation:
+      x: 0.024914339184761047
+      y: 0.05726549029350281
+      z: 0.3355788588523865
+      w: 0.9399398565292358
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241613
+      nanosec: 11511866
+    frame_id: map
+  child_frame_id: object_1
+  transform:
+    translation:
+      x: 1.5
+      y: 1.5
+      z: 0.5
+    rotation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241613
+      nanosec: 65674320
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03741220757365227
+      y: -0.03522951528429985
+      z: 0.03623349964618683
+    rotation:
+      x: 0.02517932839691639
+      y: 0.05722535029053688
+      z: 0.3355672359466553
+      w: 0.9399393200874329
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241613
+      nanosec: 73484281
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03754429519176483
+      y: -0.035001277923583984
+      z: 0.036229945719242096
+    rotation:
+      x: 0.024954522028565407
+      y: 0.057245321571826935
+      z: 0.3355836272239685
+      w: 0.9399382472038269
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241613
+      nanosec: 72786415
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03754429519176483
+      y: -0.035001277923583984
+      z: 0.036229945719242096
+    rotation:
+      x: 0.024954522028565407
+      y: 0.057245321571826935
+      z: 0.3355836272239685
+      w: 0.9399382472038269
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241613
+      nanosec: 91642028
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03741220757365227
+      y: -0.03522951528429985
+      z: 0.03623349964618683
+    rotation:
+      x: 0.02517932839691639
+      y: 0.05722535029053688
+      z: 0.3355672359466553
+      w: 0.9399393200874329
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241613
+      nanosec: 110450600
+    frame_id: map
+  child_frame_id: object_1
+  transform:
+    translation:
+      x: 1.5
+      y: 1.5
+      z: 0.5
+    rotation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241613
+      nanosec: 172919469
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03780162334442139
+      y: -0.03499897941946983
+      z: 0.03623107448220253
+    rotation:
+      x: 0.025354504585266113
+      y: 0.057194530963897705
+      z: 0.33554738759994507
+      w: 0.9399435520172119
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241613
+      nanosec: 173776185
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.037721749395132065
+      y: -0.03504626825451851
+      z: 0.03623157739639282
+    rotation:
+      x: 0.0253185722976923
+      y: 0.05720085650682449
+      z: 0.33555150032043457
+      w: 0.9399427175521851
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241613
+      nanosec: 175484720
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.037721749395132065
+      y: -0.03504626825451851
+      z: 0.03623157739639282
+    rotation:
+      x: 0.0253185722976923
+      y: 0.05720085650682449
+      z: 0.33555150032043457
+      w: 0.9399427175521851
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241613
+      nanosec: 191648712
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03780162334442139
+      y: -0.03499897941946983
+      z: 0.03623107448220253
+    rotation:
+      x: 0.025354504585266113
+      y: 0.057194530963897705
+      z: 0.33554738759994507
+      w: 0.9399435520172119
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241613
+      nanosec: 211494706
+    frame_id: map
+  child_frame_id: object_1
+  transform:
+    translation:
+      x: 1.5
+      y: 1.5
+      z: 0.5
+    rotation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241613
+      nanosec: 273777877
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.037721749395132065
+      y: -0.03504626825451851
+      z: 0.03623157739639282
+    rotation:
+      x: 0.0253185722976923
+      y: 0.05720085650682449
+      z: 0.33555150032043457
+      w: 0.9399427175521851
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241613
+      nanosec: 273702868
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03757476806640625
+      y: -0.034885820001363754
+      z: 0.03615014627575874
+    rotation:
+      x: 0.025129826739430428
+      y: 0.057183120399713516
+      z: 0.3355196416378021
+      w: 0.939960241317749
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241613
+      nanosec: 275488235
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.037721749395132065
+      y: -0.03504626825451851
+      z: 0.03623157739639282
+    rotation:
+      x: 0.0253185722976923
+      y: 0.05720085650682449
+      z: 0.33555150032043457
+      w: 0.9399427175521851
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241613
+      nanosec: 292190091
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03757476806640625
+      y: -0.034885820001363754
+      z: 0.03615014627575874
+    rotation:
+      x: 0.025129826739430428
+      y: 0.057183120399713516
+      z: 0.3355196416378021
+      w: 0.939960241317749
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241613
+      nanosec: 310474816
+    frame_id: map
+  child_frame_id: object_1
+  transform:
+    translation:
+      x: 1.5
+      y: 1.5
+      z: 0.5
+    rotation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241613
+      nanosec: 373674959
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03749515116214752
+      y: -0.034870292991399765
+      z: 0.035993754863739014
+    rotation:
+      x: 0.024982120841741562
+      y: 0.057159267365932465
+      z: 0.33547505736351013
+      w: 0.9399814605712891
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241613
+      nanosec: 373778608
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03751137852668762
+      y: -0.03487347066402435
+      z: 0.03602563962340355
+    rotation:
+      x: 0.025012236088514328
+      y: 0.05716412886977196
+      z: 0.33548417687416077
+      w: 0.9399771690368652
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241613
+      nanosec: 375486599
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03751137852668762
+      y: -0.03487347066402435
+      z: 0.03602563962340355
+    rotation:
+      x: 0.025012236088514328
+      y: 0.05716412886977196
+      z: 0.33548417687416077
+      w: 0.9399771690368652
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241613
+      nanosec: 392802479
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03749515116214752
+      y: -0.034870292991399765
+      z: 0.035993754863739014
+    rotation:
+      x: 0.024982120841741562
+      y: 0.057159267365932465
+      z: 0.33547505736351013
+      w: 0.9399814605712891
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241613
+      nanosec: 413733736
+    frame_id: map
+  child_frame_id: object_1
+  transform:
+    translation:
+      x: 1.5
+      y: 1.5
+      z: 0.5
+    rotation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241613
+      nanosec: 480370245
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03751137852668762
+      y: -0.03487347066402435
+      z: 0.03602563962340355
+    rotation:
+      x: 0.025012236088514328
+      y: 0.05716412886977196
+      z: 0.33548417687416077
+      w: 0.9399771690368652
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241613
+      nanosec: 496878850
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03785647451877594
+      y: -0.035195380449295044
+      z: 0.03624853491783142
+    rotation:
+      x: 0.02520701289176941
+      y: 0.0572834312915802
+      z: 0.33564192056655884
+      w: 0.9399083852767944
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241613
+      nanosec: 497949328
+    frame_id: slamware_map
+  child_frame_id: laser
+  transform:
+    translation:
+      x: -0.03751137852668762
+      y: -0.03487347066402435
+      z: 0.03602563962340355
+    rotation:
+      x: 0.025012236088514328
+      y: 0.05716412886977196
+      z: 0.33548417687416077
+      w: 0.9399771690368652
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241613
+      nanosec: 505823706
+    frame_id: odom
+  child_frame_id: base_link
+  transform:
+    translation:
+      x: -0.03785647451877594
+      y: -0.035195380449295044
+      z: 0.03624853491783142
+    rotation:
+      x: 0.02520701289176941
+      y: 0.0572834312915802
+      z: 0.33564192056655884
+      w: 0.9399083852767944
+---
+transforms:
+- header:
+    stamp:
+      sec: 1772241613
+      nanosec: 510449656
+    frame_id: map
+  child_frame_id: object_1
+  transform:
+    translation:
+      x: 1.5
+      y: 1.5
+      z: 0.5
+    rotation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+---
