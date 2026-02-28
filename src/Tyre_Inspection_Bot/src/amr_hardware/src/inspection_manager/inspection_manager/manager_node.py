@@ -15,6 +15,7 @@ from nav2_msgs.action import NavigateToPose
 import rclpy
 from rclpy.action import ActionClient
 from rclpy.node import Node
+from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from tf2_ros import Buffer, TransformListener
 from std_msgs.msg import String as StringMsg
 
@@ -69,6 +70,7 @@ class InspectionManagerUnified(Node):
         self.declare_parameter("alignment_min_quality", 0.9)
         self.declare_parameter("retry_yaw_step_deg", 15.0)
         self.declare_parameter("retry_backoff_m", 0.5)
+        self.declare_parameter("use_navigation_action", True)
         self.declare_parameter("navigate_timeout_s", 45.0)
         self.declare_parameter("approach_offset", 0.6)
         self.vehicle_labels = [str(x).strip() for x in self.get_parameter("vehicle_labels").value]
@@ -81,6 +83,7 @@ class InspectionManagerUnified(Node):
         self.alignment_min_quality = float(self.get_parameter("alignment_min_quality").value)
         self.retry_yaw_step_deg = float(self.get_parameter("retry_yaw_step_deg").value)
         self.retry_backoff_m = float(self.get_parameter("retry_backoff_m").value)
+        self.use_navigation_action = self._as_bool(self.get_parameter("use_navigation_action").value)
         self.navigate_timeout_s = float(self.get_parameter("navigate_timeout_s").value)
 
         self.persistence = MissionStatePersistence()
@@ -101,17 +104,18 @@ class InspectionManagerUnified(Node):
         self.start_srv = self.create_service(StartMission, "/inspection_manager/start_mission", self._start_mission)
         self.capture_cli = self.create_client(CapturePhoto, "/photo_capture/capture")
         self.metrics = {"mission_start_s": 0.0, "per_tire": {}, "events": []}
+        qos_sensor = QoSProfile(depth=10, reliability=ReliabilityPolicy.BEST_EFFORT, history=HistoryPolicy.KEEP_LAST)
         self.create_subscription(
             BoundingBoxes3d,
             str(self.get_parameter("vehicle_detection_topic").value),
             self._on_vehicle_boxes,
-            10,
+            qos_sensor,
         )
         self.create_subscription(
             BoundingBoxes3d,
             str(self.get_parameter("tire_detection_topic").value),
             self._on_tire_boxes,
-            10,
+            qos_sensor,
         )
         self.create_timer(0.4, self._tick)
         self._resume_if_needed()
@@ -120,6 +124,14 @@ class InspectionManagerUnified(Node):
     @staticmethod
     def _now() -> str:
         return datetime.now(timezone.utc).isoformat()
+
+    @staticmethod
+    def _as_bool(value) -> bool:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.strip().lower() in ("1", "true", "yes", "on")
+        return bool(value)
 
     def _publish_status(self) -> None:
         msg = MissionStatus()
@@ -237,11 +249,15 @@ class InspectionManagerUnified(Node):
         except Exception:
             return None
 
-    def _navigate_to(self, goal: Dict) -> bool:
+    def _navigate_to(self, goal: Dict) -> tuple[bool, float]:
         t0 = self.get_clock().now().nanoseconds / 1e9
+        if not self.use_navigation_action:
+            elapsed = (self.get_clock().now().nanoseconds / 1e9) - t0
+            self._emit_metrics("nav_result", {"success": True, "elapsed_s": elapsed, "bypass": True})
+            return True, elapsed
         if not self.navigate_client.wait_for_server(timeout_sec=2.0):
             self.get_logger().error("navigate_to_pose action server unavailable")
-            return False
+            return False, (self.get_clock().now().nanoseconds / 1e9) - t0
         nav_goal = NavigateToPose.Goal()
         pose = PoseStamped()
         pose.header.frame_id = goal.get("frame_id", "map")
@@ -256,15 +272,16 @@ class InspectionManagerUnified(Node):
         goal_handle = send_future.result()
         if goal_handle is None or not goal_handle.accepted:
             self.get_logger().error("NavigateToPose goal rejected")
-            return False
+            return False, (self.get_clock().now().nanoseconds / 1e9) - t0
         result_future = goal_handle.get_result_async()
         rclpy.spin_until_future_complete(self, result_future, timeout_sec=self.navigate_timeout_s)
         if result_future.result() is None:
             self.get_logger().error("NavigateToPose timed out")
-            return False
+            return False, (self.get_clock().now().nanoseconds / 1e9) - t0
         success = int(result_future.result().status) == int(GoalStatus.STATUS_SUCCEEDED)
-        self._emit_metrics("nav_result", {"success": success, "elapsed_s": (self.get_clock().now().nanoseconds / 1e9) - t0})
-        return success
+        elapsed = (self.get_clock().now().nanoseconds / 1e9) - t0
+        self._emit_metrics("nav_result", {"success": success, "elapsed_s": elapsed})
+        return success, elapsed
 
     def _align_tire(self, tire: Dict) -> bool:
         t0 = self.get_clock().now().nanoseconds / 1e9
@@ -396,9 +413,9 @@ class InspectionManagerUnified(Node):
             self.state = MissionState.NAVIGATE_TO_TIRE
         elif self.state == MissionState.NAVIGATE_TO_TIRE:
             tire = self.tires[self.current_tire_index]
-            ok = self._navigate_to(tire["goal"])
+            ok, nav_elapsed = self._navigate_to(tire["goal"])
             tm = self._tire_metrics(tire["tire_id"])
-            tm["nav_time_s"] += float(self.metrics["events"][-1]["elapsed_s"]) if self.metrics["events"] else 0.0
+            tm["nav_time_s"] += float(nav_elapsed)
             if ok:
                 self.nav_retry_same_direction = 0
                 self.state = MissionState.FINAL_ALIGNMENT

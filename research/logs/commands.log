@@ -44211,3 +44211,16 @@ Summary: 2 packages finished [12.1s]
 7 passed in 1.07s
 [exit_code=0]
 
+[$(date -Iseconds)] $ colcon build --packages-select inspection_manager inspection_manager_interfaces
+Summary: build passed for visual_servo/continuity/metrics updates.
+
+[$(date -Iseconds)] $ python3 -m pytest -q src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/test/...
+Summary: targeted suite passed (7 tests).
+
+[$(date -Iseconds)] $ bash scripts/run_mission_from_rosbag.sh > research/logs/integration_results.txt 2>&1
+Summary: integration mission failed due /visual_servo/align action-server conflict + photo_capture instability under mixed publishers.
+
+[$(date -Iseconds)] $ ros2 launch inspection_manager inspection_manager.launch.py
+[$(date -Iseconds)] $ ros2 service call /inspection_manager/start_mission ...
+Summary: live mission mission_bce993189a80 stayed in DISCOVERY (no tyres enumerated).
+

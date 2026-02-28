@@ -1,0 +1,655 @@
+{
+  "mission": {
+    "mission_id": "mission_bce993189a80",
+    "object_id": "auto",
+    "state": "DISCOVERY",
+    "allow_partial_success": 0,
+    "created_at": "2026-02-28T05:01:05.508700+00:00",
+    "updated_at": "2026-02-28T05:01:36.570456+00:00",
+    "config_json": "{\"max_retries_per_tyre\":5,\"allow_partial_success\":false}",
+    "failure_reason": ""
+  },
+  "tires": [],
+  "events": [
+    {
+      "id": 30738,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:05.508700+00:00",
+      "state": "DISCOVERY",
+      "event_type": "mission_start",
+      "payload_json": "{\"object_id\": \"auto\"}"
+    },
+    {
+      "id": 30739,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:05.575882+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30740,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:05.771561+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30741,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:06.243871+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30742,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:06.575616+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30743,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:06.970022+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30744,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:07.372062+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30745,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:07.773320+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30746,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:08.169879+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30747,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:08.570070+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30748,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:08.970672+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30749,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:09.369990+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30750,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:09.769632+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30751,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:10.171641+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30752,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:10.572451+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30753,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:10.972946+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30754,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:11.372498+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30755,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:12.167206+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30756,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:12.231166+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30757,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:12.570180+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30758,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:12.971212+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30759,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:13.370110+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30760,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:13.769623+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30761,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:14.196918+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30762,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:14.570041+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30763,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:14.970068+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30764,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:15.370000+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30765,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:15.770072+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30766,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:16.176296+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30767,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:16.574439+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30768,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:16.969996+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30769,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:17.374141+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30770,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:17.770315+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30771,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:18.171694+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30772,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:18.571086+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30773,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:18.970025+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30774,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:19.369659+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30775,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:19.770698+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30776,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:20.171671+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30777,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:20.570050+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30778,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:20.969644+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30779,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:21.370397+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30780,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:21.770097+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30781,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:22.171162+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30782,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:22.569584+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30783,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:22.970505+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30784,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:23.371567+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30785,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:23.770210+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30786,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:24.169275+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30787,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:24.570762+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30788,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:24.969674+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30789,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:25.375152+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30790,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:25.770141+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30791,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:26.190319+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30792,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:26.577830+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30793,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:26.974073+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30794,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:27.370466+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30795,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:27.770074+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30796,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:28.172260+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30797,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:28.570121+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30798,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:28.973767+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30799,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:29.370382+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30800,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:29.769188+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30801,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:30.171945+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30802,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:30.569413+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30803,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:30.970215+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30804,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:31.371658+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30805,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:31.770025+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30806,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:32.169304+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30807,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:32.570058+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30808,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:32.970201+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30809,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:33.370477+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30810,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:33.771351+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30811,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:34.170388+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30812,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:34.574799+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30813,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:34.978041+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30814,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:35.370573+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30815,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:35.770066+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30816,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:36.184912+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 30817,
+      "mission_id": "mission_bce993189a80",
+      "ts": "2026-02-28T05:01:36.570456+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    }
+  ]
+}
