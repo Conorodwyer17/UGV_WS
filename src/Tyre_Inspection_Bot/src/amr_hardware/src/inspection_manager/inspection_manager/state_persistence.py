@@ -165,7 +165,21 @@ class MissionStatePersistence:
             )
             conn.execute(
                 "INSERT INTO events(mission_id, ts, state, event_type, payload_json) VALUES (?, ?, ?, ?, ?)",
-                (mission_id, now, status.upper(), "tire_status", json.dumps({"tire_id": tire_id, "status": status})),
+                (
+                    mission_id,
+                    now,
+                    status.upper(),
+                    "tire_status",
+                    json.dumps(
+                        {
+                            "tire_id": tire_id,
+                            "status": status,
+                            "attempt_count": next_attempts,
+                            "last_error": last_error,
+                            "photo_path": photo_path,
+                        }
+                    ),
+                ),
             )
 
     def get_mission_state(self, mission_id: str) -> Optional[Dict[str, Any]]:

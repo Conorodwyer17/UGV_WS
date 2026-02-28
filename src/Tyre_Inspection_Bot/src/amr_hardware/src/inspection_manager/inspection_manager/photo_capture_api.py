@@ -42,6 +42,20 @@ class PhotoCaptureApi(Node):
         self.srv = self.create_service(CapturePhoto, "/photo_capture/capture", self._handle_capture)
         self.get_logger().info(f"photo_capture API ready on /photo_capture/capture from {self.image_topic}")
 
+    @staticmethod
+    def _estimate_center_coverage(frame) -> float:
+        h, w = frame.shape[:2]
+        cx0 = int(0.25 * w)
+        cx1 = int(0.75 * w)
+        cy0 = int(0.25 * h)
+        cy1 = int(0.75 * h)
+        roi = frame[cy0:cy1, cx0:cx1]
+        if roi.size == 0:
+            return 0.0
+        gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+        edges = cv2.Canny(gray, 80, 160)
+        return float((edges > 0).sum()) / float(edges.size)
+
     def _on_image(self, msg: Image) -> None:
         self._last_image_msg = msg
         self._last_image_walltime = self.get_clock().now().nanoseconds / 1e9
@@ -78,7 +92,8 @@ class PhotoCaptureApi(Node):
 
         out_dir = os.path.join(self.output_root, mission_id)
         os.makedirs(out_dir, exist_ok=True)
-        file_path = os.path.join(out_dir, f"{tire_id}.png")
+        stamp_ms = int(self.get_clock().now().nanoseconds / 1e6)
+        file_path = os.path.join(out_dir, f"{tire_id}_{stamp_ms}.png")
         try:
             frame = self._bridge.imgmsg_to_cv2(self._last_image_msg, desired_encoding="bgr8")
             ok = cv2.imwrite(file_path, frame)
@@ -117,6 +132,7 @@ class PhotoCaptureApi(Node):
                 "height": int(self._last_camera_info.height) if self._last_camera_info is not None else 0,
             },
             "projection_overlap": 0.8,
+            "tire_center_coverage": self._estimate_center_coverage(frame),
         }
         with open(os.path.join(out_dir, f"{tire_id}.json"), "w", encoding="utf-8") as f:
             json.dump(metadata, f, indent=2)

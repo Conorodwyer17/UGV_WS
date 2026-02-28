@@ -3,6 +3,7 @@
 
 import json
 import math
+import os
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Dict, List, Optional
@@ -15,6 +16,7 @@ import rclpy
 from rclpy.action import ActionClient
 from rclpy.node import Node
 from tf2_ros import Buffer, TransformListener
+from std_msgs.msg import String as StringMsg
 
 from inspection_manager.approach_planner import ApproachPlanner
 from inspection_manager.continuity_manager import ContinuityManager
@@ -65,6 +67,8 @@ class InspectionManagerUnified(Node):
         self.declare_parameter("alignment_pos_rms_m", 0.05)
         self.declare_parameter("alignment_ang_deg", 3.0)
         self.declare_parameter("alignment_min_quality", 0.9)
+        self.declare_parameter("retry_yaw_step_deg", 15.0)
+        self.declare_parameter("retry_backoff_m", 0.5)
         self.declare_parameter("navigate_timeout_s", 45.0)
         self.declare_parameter("approach_offset", 0.6)
         self.vehicle_labels = [str(x).strip() for x in self.get_parameter("vehicle_labels").value]
@@ -75,6 +79,8 @@ class InspectionManagerUnified(Node):
         self.alignment_pos_rms_m = float(self.get_parameter("alignment_pos_rms_m").value)
         self.alignment_ang_deg = float(self.get_parameter("alignment_ang_deg").value)
         self.alignment_min_quality = float(self.get_parameter("alignment_min_quality").value)
+        self.retry_yaw_step_deg = float(self.get_parameter("retry_yaw_step_deg").value)
+        self.retry_backoff_m = float(self.get_parameter("retry_backoff_m").value)
         self.navigate_timeout_s = float(self.get_parameter("navigate_timeout_s").value)
 
         self.persistence = MissionStatePersistence()
@@ -91,8 +97,10 @@ class InspectionManagerUnified(Node):
         self.last_reacquire_start_s = 0.0
 
         self.status_pub = self.create_publisher(MissionStatus, "/inspection_manager/mission_status", 10)
+        self.metrics_pub = self.create_publisher(StringMsg, "/inspection_manager/metrics", 10)
         self.start_srv = self.create_service(StartMission, "/inspection_manager/start_mission", self._start_mission)
         self.capture_cli = self.create_client(CapturePhoto, "/photo_capture/capture")
+        self.metrics = {"mission_start_s": 0.0, "per_tire": {}, "events": []}
         self.create_subscription(
             BoundingBoxes3d,
             str(self.get_parameter("vehicle_detection_topic").value),
@@ -123,6 +131,13 @@ class InspectionManagerUnified(Node):
         msg.percent_complete = float(0.0 if total == 0 else (100.0 * completed / total))
         msg.last_event_ts = self._now()
         self.status_pub.publish(msg)
+
+    def _emit_metrics(self, event: str, payload: Dict) -> None:
+        payload = {"event": event, "ts": self._now(), **payload}
+        self.metrics["events"].append(payload)
+        out = StringMsg()
+        out.data = json.dumps(payload)
+        self.metrics_pub.publish(out)
 
     def _on_vehicle_boxes(self, msg: BoundingBoxes3d) -> None:
         self.world_model.update_vehicles(msg, self.vehicle_labels, self.vehicle_min_prob)
@@ -165,6 +180,7 @@ class InspectionManagerUnified(Node):
             except Exception:
                 config = {}
         self.max_retries = int(config.get("max_retries", 5))
+        self.max_retries = int(config.get("max_retries_per_tyre", self.max_retries))
         self.allow_partial_success = bool(config.get("allow_partial_success", False))
         if self.allow_partial_success:
             self.get_logger().warn("allow_partial_success enabled by mission config")
@@ -181,6 +197,11 @@ class InspectionManagerUnified(Node):
         self.current_tire_index = 0
         self.continuity.direction_lock = None
         self.state = MissionState.DISCOVERY
+        self.metrics = {
+            "mission_start_s": self.get_clock().now().nanoseconds / 1e9,
+            "per_tire": {},
+            "events": [],
+        }
         self.persistence.set_mission_state(self.current_mission_id, self.state.value)
         self._publish_status()
         res.started = True
@@ -190,6 +211,17 @@ class InspectionManagerUnified(Node):
 
     def _resolve_target_vehicle(self) -> Optional[str]:
         return self.world_model.resolve_vehicle_id(self.requested_object_id)
+
+    def _tire_metrics(self, tire_id: str) -> Dict:
+        if tire_id not in self.metrics["per_tire"]:
+            self.metrics["per_tire"][tire_id] = {
+                "detection_confidence": 0.0,
+                "nav_time_s": 0.0,
+                "alignment_time_s": 0.0,
+                "capture_retries": 0,
+                "final_pose_error": {},
+            }
+        return self.metrics["per_tire"][tire_id]
 
     def _yaw_to_quat(self, yaw: float) -> Quaternion:
         q = Quaternion()
@@ -205,6 +237,7 @@ class InspectionManagerUnified(Node):
             return None
 
     def _navigate_to(self, goal: Dict) -> bool:
+        t0 = self.get_clock().now().nanoseconds / 1e9
         if not self.navigate_client.wait_for_server(timeout_sec=2.0):
             self.get_logger().error("navigate_to_pose action server unavailable")
             return False
@@ -228,9 +261,12 @@ class InspectionManagerUnified(Node):
         if result_future.result() is None:
             self.get_logger().error("NavigateToPose timed out")
             return False
-        return int(result_future.result().status) == int(GoalStatus.STATUS_SUCCEEDED)
+        success = int(result_future.result().status) == int(GoalStatus.STATUS_SUCCEEDED)
+        self._emit_metrics("nav_result", {"success": success, "elapsed_s": (self.get_clock().now().nanoseconds / 1e9) - t0})
+        return success
 
     def _align_tire(self, tire: Dict) -> bool:
+        t0 = self.get_clock().now().nanoseconds / 1e9
         if not self.align_client.wait_for_server(timeout_sec=2.0):
             self.get_logger().error("visual_servo align action server unavailable")
             return False
@@ -271,11 +307,47 @@ class InspectionManagerUnified(Node):
             "angular_deg": float(r.angular_deg),
             "control_quality": float(r.control_quality),
         }
+        self._emit_metrics(
+            "alignment_result",
+            {
+                "tire_id": tire["tire_id"],
+                "success": True,
+                "elapsed_s": (self.get_clock().now().nanoseconds / 1e9) - t0,
+                "position_rms": float(r.position_rms),
+                "angular_deg": float(r.angular_deg),
+                "control_quality": float(r.control_quality),
+            },
+        )
         return (
             float(r.position_rms) <= self.alignment_pos_rms_m
             and float(r.angular_deg) <= self.alignment_ang_deg
             and float(r.control_quality) >= self.alignment_min_quality
         )
+
+    def _apply_retry_policy(self, tire: Dict) -> MissionState:
+        stage = str(tire.get("retry_stage", "realign"))
+        if stage == "realign":
+            tire["retry_stage"] = "yaw_step"
+            return MissionState.FINAL_ALIGNMENT
+        if stage == "yaw_step":
+            tire["retry_stage"] = "backoff_reapproach"
+            sign = 1.0 if (int(tire.get("attempt_count", 0)) % 2 == 0) else -1.0
+            goal = dict(tire.get("goal", {}))
+            goal["yaw_rad"] = float(goal.get("yaw_rad", 0.0)) + math.radians(sign * self.retry_yaw_step_deg)
+            tire["goal"] = goal
+            return MissionState.NAVIGATE_TO_TIRE
+        if stage == "backoff_reapproach":
+            tire["retry_stage"] = "global_reacquire"
+            goal = dict(tire.get("goal", {}))
+            yaw = float(goal.get("yaw_rad", 0.0))
+            goal["x"] = float(goal.get("x", 0.0)) - self.retry_backoff_m * math.cos(yaw)
+            goal["y"] = float(goal.get("y", 0.0)) - self.retry_backoff_m * math.sin(yaw)
+            tire["goal"] = goal
+            return MissionState.NAVIGATE_TO_TIRE
+        # global_reacquire
+        tire["retry_stage"] = "realign"
+        self.last_reacquire_start_s = 0.0
+        return MissionState.DISCOVERY
 
     def _tick(self) -> None:
         if not self.current_mission_id:
@@ -294,9 +366,12 @@ class InspectionManagerUnified(Node):
         elif self.state == MissionState.TIRE_ENUMERATION:
             live_tires = self.world_model.get_tires_for_vehicle(self.target_vehicle_id, max_stale_s=1.0)
             ordered = self.continuity.order_tires(live_tires, robot_pose=self._robot_pose_map())
-            self.tires = [{"status": "pending", "attempt_count": 0, **t} for t in ordered]
+            self.tires = [{"status": "pending", "attempt_count": 0, "retry_stage": "realign", **t} for t in ordered]
             if self.tires:
                 self.persistence.add_tires(self.current_mission_id, [t["tire_id"] for t in self.tires])
+                for t in self.tires:
+                    m = self._tire_metrics(t["tire_id"])
+                    m["detection_confidence"] = float(t.get("confidence", 0.0))
                 self.current_tire_index = 0
                 self.current_tire_attempt = 0
                 self.state = MissionState.PLAN_APPROACH
@@ -312,6 +387,8 @@ class InspectionManagerUnified(Node):
         elif self.state == MissionState.NAVIGATE_TO_TIRE:
             tire = self.tires[self.current_tire_index]
             ok = self._navigate_to(tire["goal"])
+            tm = self._tire_metrics(tire["tire_id"])
+            tm["nav_time_s"] += float(self.metrics["events"][-1]["elapsed_s"]) if self.metrics["events"] else 0.0
             if ok:
                 self.nav_retry_same_direction = 0
                 self.state = MissionState.FINAL_ALIGNMENT
@@ -342,6 +419,9 @@ class InspectionManagerUnified(Node):
             tire = self.tires[self.current_tire_index]
             tire["attempt_count"] = int(tire.get("attempt_count", 0)) + 1
             ok = self._align_tire(tire)
+            tm = self._tire_metrics(tire["tire_id"])
+            if self.metrics["events"] and self.metrics["events"][-1].get("event") == "alignment_result":
+                tm["alignment_time_s"] += float(self.metrics["events"][-1].get("elapsed_s", 0.0))
             if ok:
                 self.state = MissionState.CAPTURE
             else:
@@ -357,8 +437,21 @@ class InspectionManagerUnified(Node):
                 tire["photo_metadata"] = meta
                 self.state = MissionState.POST_PROCESS
             else:
+                tire["photo_path"] = file_path
+                tire["photo_metadata"] = meta
+                self.persistence.set_tire_status(
+                    self.current_mission_id,
+                    tire["tire_id"],
+                    "retry_pending",
+                    attempt_increment=1,
+                    last_error=f"verify_failed_stage:{tire.get('retry_stage', 'realign')}",
+                    photo_path=file_path,
+                    photo_metadata=meta,
+                )
+                tm = self._tire_metrics(tire["tire_id"])
+                tm["capture_retries"] += 1
                 if int(tire.get("attempt_count", 0)) < self.max_retries:
-                    self.state = MissionState.FINAL_ALIGNMENT
+                    self.state = self._apply_retry_policy(tire)
                 elif self.allow_partial_success:
                     tire["status"] = "failed"
                     self.persistence.set_tire_status(
@@ -383,6 +476,8 @@ class InspectionManagerUnified(Node):
                     photo_path=tire.get("photo_path", ""),
                     photo_metadata=tire.get("photo_metadata", {}),
                 )
+                tm = self._tire_metrics(tire["tire_id"])
+                tm["final_pose_error"] = tire.get("final_pose_error", {})
             if self.current_tire_index == len(self.tires) - 1:
                 # strict completion check
                 if all(t.get("status") == "completed" for t in self.tires):
@@ -396,12 +491,14 @@ class InspectionManagerUnified(Node):
                 self.state = MissionState.PLAN_APPROACH
         elif self.state == MissionState.COMPLETE:
             self.persistence.set_mission_state(self.current_mission_id, MissionState.COMPLETE.value)
+            self._write_metrics("COMPLETE")
             self._publish_status()
             self.state = MissionState.IDLE
             self.current_mission_id = ""
             return
         elif self.state == MissionState.FAILED:
             self.persistence.set_mission_state(self.current_mission_id, MissionState.FAILED.value, "mission_failed")
+            self._write_metrics("FAILED")
             self._publish_status()
             self.state = MissionState.IDLE
             self.current_mission_id = ""
@@ -409,6 +506,28 @@ class InspectionManagerUnified(Node):
 
         self.persistence.set_mission_state(self.current_mission_id, self.state.value)
         self._publish_status()
+
+    def _write_metrics(self, mission_state: str) -> None:
+        mission_id = self.current_mission_id
+        if not mission_id:
+            return
+        metrics_dir = "research/logs/metrics"
+        os.makedirs(metrics_dir, exist_ok=True)
+        total = len(self.tires)
+        completed = len([t for t in self.tires if t.get("status") == "completed"])
+        total_time_s = (self.get_clock().now().nanoseconds / 1e9) - float(self.metrics.get("mission_start_s", 0.0))
+        report = {
+            "mission_id": mission_id,
+            "mission_state": mission_state,
+            "total_time_s": total_time_s,
+            "tyres_total": total,
+            "tyres_completed": completed,
+            "success_rate": 0.0 if total == 0 else float(completed) / float(total),
+            "per_tire": self.metrics.get("per_tire", {}),
+            "events": self.metrics.get("events", []),
+        }
+        with open(os.path.join(metrics_dir, f"{mission_id}.json"), "w", encoding="utf-8") as f:
+            json.dump(report, f, indent=2)
 
     def _capture_and_verify(self, tire: Dict):
         req = CapturePhoto.Request()

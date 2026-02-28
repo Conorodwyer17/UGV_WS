@@ -44197,3 +44197,17 @@ ERROR src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager - Modul...
 1 error in 0.44s
 [exit_code=2]
 
+[2026-02-28T04:09:21+00:00] $ source /opt/ros/humble/setup.bash && colcon build --packages-select inspection_manager_interfaces inspection_manager
+Starting >>> inspection_manager_interfaces
+Finished <<< inspection_manager_interfaces [6.50s]
+Starting >>> inspection_manager
+Finished <<< inspection_manager [4.55s]
+
+Summary: 2 packages finished [12.1s]
+[exit_code=0]
+
+[2026-02-28T04:09:34+00:00] $ source /opt/ros/humble/setup.bash && source install/setup.bash && python3 -m pytest -q src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/test/test_alignment_refactor.py src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/test/test_continuity_manager_refactor.py src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/test/test_state_persistence_refactor.py src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/test/test_tire_enumerator_refactor.py src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/test/test_photo_verifier_refactor.py
+.......                                                                  [100%]
+7 passed in 1.07s
+[exit_code=0]
+
