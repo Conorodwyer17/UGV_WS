@@ -44153,3 +44153,47 @@ FAILED src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/test/test
 /opt/ros/humble/setup.bash: -c: line 2: syntax error: unexpected end of file
 [exit_code=2]
 
+[2026-02-28T03:55:54+00:00] $ source /opt/ros/humble/setup.bash && colcon build --packages-select inspection_manager_interfaces inspection_manager
+Starting >>> inspection_manager_interfaces
+Finished <<< inspection_manager_interfaces [6.80s]
+Starting >>> inspection_manager
+Finished <<< inspection_manager [4.24s]
+
+Summary: 2 packages finished [12.1s]
+[exit_code=0]
+
+[2026-02-28T03:56:07+00:00] $ source /opt/ros/humble/setup.bash && source install/setup.bash && python3 -m pytest -q src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/test/test_continuity_manager_refactor.py src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/test/test_alignment_refactor.py
+
+==================================== ERRORS ====================================
+________________________ ERROR collecting test session _________________________
+/usr/lib/python3/dist-packages/pluggy/hooks.py:286: in __call__
+    return self._hookexec(self, self.get_hookimpls(), kwargs)
+/usr/lib/python3/dist-packages/pluggy/manager.py:92: in _hookexec
+    return self._inner_hookexec(hook, methods, kwargs)
+/usr/lib/python3/dist-packages/pluggy/manager.py:83: in <lambda>
+    self._inner_hookexec = lambda hook, methods, kwargs: hook.multicall(
+/usr/lib/python3/dist-packages/_pytest/python.py:200: in pytest_collect_file
+    module: Module = ihook.pytest_pycollect_makemodule(path=path, parent=parent)
+/usr/lib/python3/dist-packages/pluggy/hooks.py:286: in __call__
+    return self._hookexec(self, self.get_hookimpls(), kwargs)
+/usr/lib/python3/dist-packages/pluggy/manager.py:92: in _hookexec
+    return self._inner_hookexec(hook, methods, kwargs)
+/usr/lib/python3/dist-packages/pluggy/manager.py:83: in <lambda>
+    self._inner_hookexec = lambda hook, methods, kwargs: hook.multicall(
+/opt/ros/humble/lib/python3.10/site-packages/launch_testing/pytest/hooks.py:193: in pytest_pycollect_makemodule
+    entrypoint = find_launch_test_entrypoint(path)
+/opt/ros/humble/lib/python3.10/site-packages/launch_testing/pytest/hooks.py:186: in find_launch_test_entrypoint
+    module = path.pyimport()
+/usr/lib/python3/dist-packages/py/_path/local.py:704: in pyimport
+    __import__(modname)
+/usr/lib/python3/dist-packages/_pytest/assertion/rewrite.py:170: in exec_module
+    exec(co, module.__dict__)
+src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/test/test_continuity_manager_refactor.py:1: in <module>
+    from inspection_manager.continuity_manager import ContinuityManager
+E   ModuleNotFoundError: No module named 'inspection_manager.continuity_manager'
+=========================== short test summary info ============================
+ERROR src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager - Modul...
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 0.44s
+[exit_code=2]
+

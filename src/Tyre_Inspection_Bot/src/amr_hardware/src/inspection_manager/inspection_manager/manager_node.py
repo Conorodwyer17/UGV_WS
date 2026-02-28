@@ -17,6 +17,7 @@ from rclpy.node import Node
 from tf2_ros import Buffer, TransformListener
 
 from inspection_manager.approach_planner import ApproachPlanner
+from inspection_manager.continuity_manager import ContinuityManager
 from inspection_manager.photo_verifier import PhotoVerifier
 from inspection_manager.state_persistence import MissionStatePersistence
 from inspection_manager.world_model import WorldModel
@@ -78,6 +79,7 @@ class InspectionManagerUnified(Node):
 
         self.persistence = MissionStatePersistence()
         self.planner = ApproachPlanner(standoff_m=float(self.get_parameter("approach_offset").value))
+        self.continuity = ContinuityManager()
         self.verifier = PhotoVerifier()
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
@@ -85,6 +87,7 @@ class InspectionManagerUnified(Node):
         self.navigate_client = ActionClient(self, NavigateToPose, "/navigate_to_pose")
         self.align_client = ActionClient(self, AlignTire, "/visual_servo/align")
         self.current_tire_attempt = 0
+        self.nav_retry_same_direction = 0
         self.last_reacquire_start_s = 0.0
 
         self.status_pub = self.create_publisher(MissionStatus, "/inspection_manager/mission_status", 10)
@@ -174,7 +177,9 @@ class InspectionManagerUnified(Node):
         self.target_vehicle_id = ""
         self.tires = []
         self.current_tire_attempt = 0
+        self.nav_retry_same_direction = 0
         self.current_tire_index = 0
+        self.continuity.direction_lock = None
         self.state = MissionState.DISCOVERY
         self.persistence.set_mission_state(self.current_mission_id, self.state.value)
         self._publish_status()
@@ -191,6 +196,13 @@ class InspectionManagerUnified(Node):
         q.z = math.sin(0.5 * yaw)
         q.w = math.cos(0.5 * yaw)
         return q
+
+    def _robot_pose_map(self) -> Optional[Dict[str, float]]:
+        try:
+            tf = self.tf_buffer.lookup_transform("map", "base_link", rclpy.time.Time())
+            return {"x": tf.transform.translation.x, "y": tf.transform.translation.y, "z": tf.transform.translation.z}
+        except Exception:
+            return None
 
     def _navigate_to(self, goal: Dict) -> bool:
         if not self.navigate_client.wait_for_server(timeout_sec=2.0):
@@ -281,7 +293,8 @@ class InspectionManagerUnified(Node):
                     self.state = MissionState.FAILED
         elif self.state == MissionState.TIRE_ENUMERATION:
             live_tires = self.world_model.get_tires_for_vehicle(self.target_vehicle_id, max_stale_s=1.0)
-            self.tires = [{"status": "pending", "attempt_count": 0, **t} for t in live_tires]
+            ordered = self.continuity.order_tires(live_tires, robot_pose=self._robot_pose_map())
+            self.tires = [{"status": "pending", "attempt_count": 0, **t} for t in ordered]
             if self.tires:
                 self.persistence.add_tires(self.current_mission_id, [t["tire_id"] for t in self.tires])
                 self.current_tire_index = 0
@@ -292,16 +305,30 @@ class InspectionManagerUnified(Node):
         elif self.state == MissionState.PLAN_APPROACH:
             tire = self.tires[self.current_tire_index]
             tire["goal"] = self.planner.compute_goal(tire)
+            if self.current_tire_index + 1 < len(self.tires):
+                nxt = self.tires[self.current_tire_index + 1]
+                nxt["prefetch_goal"] = self.planner.compute_goal(nxt)
             self.state = MissionState.NAVIGATE_TO_TIRE
         elif self.state == MissionState.NAVIGATE_TO_TIRE:
             tire = self.tires[self.current_tire_index]
             ok = self._navigate_to(tire["goal"])
             if ok:
+                self.nav_retry_same_direction = 0
                 self.state = MissionState.FINAL_ALIGNMENT
             else:
                 self.current_tire_attempt += 1
-                if self.current_tire_attempt <= self.max_retries:
-                    self.state = MissionState.PLAN_APPROACH
+                self.nav_retry_same_direction += 1
+                if self.nav_retry_same_direction <= 1:
+                    # First failure: short backoff + retry same direction.
+                    backoff_goal = dict(tire["goal"])
+                    backoff_goal["x"] = float(backoff_goal["x"]) - 0.3 * math.cos(float(backoff_goal["yaw_rad"]))
+                    backoff_goal["y"] = float(backoff_goal["y"]) - 0.3 * math.sin(float(backoff_goal["yaw_rad"]))
+                    tire["goal"] = backoff_goal
+                    self.state = MissionState.NAVIGATE_TO_TIRE
+                elif self.current_tire_attempt <= self.max_retries:
+                    # Second failure: flip sweep direction and continue.
+                    self.continuity.flip_direction()
+                    self.state = MissionState.TIRE_ENUMERATION
                 else:
                     self.persistence.set_tire_status(
                         self.current_mission_id,
@@ -365,6 +392,7 @@ class InspectionManagerUnified(Node):
             else:
                 self.current_tire_index += 1
                 self.current_tire_attempt = 0
+                # Keep movement continuity by entering planning for next tyre immediately.
                 self.state = MissionState.PLAN_APPROACH
         elif self.state == MissionState.COMPLETE:
             self.persistence.set_mission_state(self.current_mission_id, MissionState.COMPLETE.value)
