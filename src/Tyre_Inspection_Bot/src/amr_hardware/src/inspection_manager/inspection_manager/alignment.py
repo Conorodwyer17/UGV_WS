@@ -1,16 +1,27 @@
 #!/usr/bin/env python3
-"""Alignment wrapper (initial implementation with simulated convergence fallback)."""
+"""Live alignment convergence utility using perception-derived error."""
 
 import time
+from typing import Callable
 
 
 class AlignmentController:
-    def converge_until(self, tolerance_cm: float, timeout_s: float) -> bool:
+    def converge_until(self, error_fn: Callable[[], float], tolerance_cm: float, timeout_s: float) -> bool:
+        """
+        Aligns until live error from `error_fn` is below threshold.
+
+        error_fn must return current lateral/pose error in meters.
+        """
         start = time.time()
-        simulated_error_cm = 30.0
+        stable_hits = 0
+        tol_m = max(0.0, tolerance_cm) / 100.0
         while time.time() - start < timeout_s:
-            simulated_error_cm *= 0.75
-            if simulated_error_cm <= tolerance_cm:
-                return True
-            time.sleep(0.02)
+            err_m = float(error_fn())
+            if err_m <= tol_m:
+                stable_hits += 1
+                if stable_hits >= 3:
+                    return True
+            else:
+                stable_hits = 0
+            time.sleep(0.08)
         return False
