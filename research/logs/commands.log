@@ -43538,3 +43538,513 @@ integration run complete
 integration run complete
 [exit_code=0]
 
+[2026-02-28T02:49:16+00:00] $ source /opt/ros/humble/setup.bash && source install/setup.bash && ros2 node list
+WARNING: Be aware that there are nodes in the graph that share an exact name, which can have unintended side effects.
+/aurora_depth_camera_info
+/aurora_semantic_fusion
+/base_link_to_base_footprint
+/behavior_server
+/bt_navigator
+/bt_navigator_navigate_through_poses_rclcpp_node
+/bt_navigator_navigate_to_pose_rclcpp_node
+/controller_server
+/demo_detector
+/demo_object_manager
+/demo_object_manager
+/demo_object_manager
+/demo_object_manager
+/demo_object_manager
+/demo_tracker
+/depth_gate
+/depth_optical2left
+/depth_optical2left
+/depth_optical2left
+/depth_optical2left
+/depth_to_registered_pointcloud
+/global_costmap/global_costmap
+/imu2Leftcam
+/imu2Leftcam
+/imu2Leftcam
+/imu2Leftcam
+/inspection_manager
+/leftcam2base
+/leftcam2base
+/leftcam2base
+/leftcam2base
+/lifecycle_manager_navigation
+/local_costmap/local_costmap
+/map_to_slamware_map
+/motor_driver_node
+/navigation_permitted_publisher
+/navigation_permitted_publisher
+/navigation_permitted_publisher
+/navigation_permitted_publisher
+/odom2map
+/odom2map
+/odom2map
+/odom2map
+/photo_capture_api
+/photo_capture_api
+/photo_capture_api
+/photo_capture_api
+/photo_capture_api
+/photo_capture_api
+/photo_capture_api
+/photo_capture_api
+/photo_capture_service
+/planner_server
+/rightcam2Leftcam
+/rightcam2Leftcam
+/rightcam2Leftcam
+/rightcam2Leftcam
+/rosbag2_recorder
+/segmentation_processor_tire
+/segmentation_processor_vehicle
+/slamware_ros_sdk_server_node
+/slamware_ros_sdk_server_node
+/slamware_ros_sdk_server_node
+/slamware_ros_sdk_server_node
+/smoother_server
+/transform_listener_impl_aaaad0124770
+/transform_listener_impl_aaaad49d0110
+/transform_listener_impl_ffff6801b4f0
+/transform_listener_impl_ffff84029c30
+/transform_listener_impl_ffff9c002db0
+/transform_listener_impl_ffffa80294e0
+/velocity_smoother
+/waypoint_follower
+[exit_code=0]
+
+[2026-02-28T02:49:19+00:00] $ source /opt/ros/humble/setup.bash && source install/setup.bash && ros2 topic list
+/aurora_interface/healthy
+/aurora_semantic/vehicle_bounding_boxes
+/behavior_server/transition_event
+/behavior_tree_log
+/bond
+/bt_navigator/transition_event
+/camera/depth/camera_info
+/camera/depth/points
+/cmd_vel
+/cmd_vel_nav
+/cmd_vel_teleop
+/controller_server/transition_event
+/cost_cloud
+/darknet_ros_3d/tire_bounding_boxes
+/darknet_ros_3d/vehicle_bounding_boxes
+/demo/detections_3d
+/demo/tracks_3d
+/diagnostics
+/evaluation
+/events/write_split
+/global_costmap/costmap
+/global_costmap/costmap_raw
+/global_costmap/costmap_updates
+/global_costmap/footprint
+/global_costmap/global_costmap/transition_event
+/global_costmap/published_footprint
+/goal_pose
+/inspection_manager/approach_markers
+/inspection_manager/capture_metadata
+/inspection_manager/capture_photo
+/inspection_manager/capture_result
+/inspection_manager/mission_report
+/inspection_manager/runtime_diagnostics
+/inspection_manager/start_mission
+/inspection_manager/vehicle_detected
+/inspection_state
+/local_costmap/costmap
+/local_costmap/costmap_raw
+/local_costmap/costmap_updates
+/local_costmap/footprint
+/local_costmap/local_costmap/transition_event
+/local_costmap/published_footprint
+/local_plan
+/marker
+/odom
+/parameter_events
+/plan
+/plan_smoothed
+/planner_server/transition_event
+/preempt_teleop
+/received_global_plan
+/rosout
+/segmentation_mode
+/segmentation_processor/debug_markers
+/segmentation_processor/debug_pointcloud
+/segmentation_processor/markers
+/segmentation_processor/registered_pointcloud
+/slamware_ros_sdk_server_node/clear_map
+/slamware_ros_sdk_server_node/depth_image_colorized
+/slamware_ros_sdk_server_node/depth_image_raw
+/slamware_ros_sdk_server_node/imu_raw_data
+/slamware_ros_sdk_server_node/left_image_raw
+/slamware_ros_sdk_server_node/map
+/slamware_ros_sdk_server_node/map_metadata
+/slamware_ros_sdk_server_node/odom
+/slamware_ros_sdk_server_node/point_cloud
+/slamware_ros_sdk_server_node/relocalization/cancel
+/slamware_ros_sdk_server_node/relocalization_status
+/slamware_ros_sdk_server_node/right_image_raw
+/slamware_ros_sdk_server_node/robot_pose
+/slamware_ros_sdk_server_node/scan
+/slamware_ros_sdk_server_node/semantic_labels
+/slamware_ros_sdk_server_node/semantic_segmentation
+/slamware_ros_sdk_server_node/set_map_localization
+/slamware_ros_sdk_server_node/set_map_update
+/slamware_ros_sdk_server_node/state
+/slamware_ros_sdk_server_node/stereo_keypoints
+/slamware_ros_sdk_server_node/sync_map
+/slamware_ros_sdk_server_node/system_status
+/smoother_server/transition_event
+/speed_limit
+/stereo/navigation_permitted
+/tf
+/tf_static
+/transformed_global_plan
+/ultralytics_tire/segmentation/objects_segment
+/ultralytics_vehicle/segmentation/objects_segment
+/velocity_smoother/transition_event
+/waypoint_follower/transition_event
+[exit_code=0]
+
+[2026-02-28T02:49:21+00:00] $ source /opt/ros/humble/setup.bash && source install/setup.bash && ros2 service list
+/aurora_depth_camera_info/describe_parameters
+/aurora_depth_camera_info/get_parameter_types
+/aurora_depth_camera_info/get_parameters
+/aurora_depth_camera_info/list_parameters
+/aurora_depth_camera_info/set_parameters
+/aurora_depth_camera_info/set_parameters_atomically
+/aurora_semantic_fusion/describe_parameters
+/aurora_semantic_fusion/get_parameter_types
+/aurora_semantic_fusion/get_parameters
+/aurora_semantic_fusion/list_parameters
+/aurora_semantic_fusion/set_parameters
+/aurora_semantic_fusion/set_parameters_atomically
+/base_link_to_base_footprint/describe_parameters
+/base_link_to_base_footprint/get_parameter_types
+/base_link_to_base_footprint/get_parameters
+/base_link_to_base_footprint/list_parameters
+/base_link_to_base_footprint/set_parameters
+/base_link_to_base_footprint/set_parameters_atomically
+/behavior_server/change_state
+/behavior_server/describe_parameters
+/behavior_server/get_available_states
+/behavior_server/get_available_transitions
+/behavior_server/get_parameter_types
+/behavior_server/get_parameters
+/behavior_server/get_state
+/behavior_server/get_transition_graph
+/behavior_server/list_parameters
+/behavior_server/set_parameters
+/behavior_server/set_parameters_atomically
+/bt_navigator/change_state
+/bt_navigator/describe_parameters
+/bt_navigator/get_available_states
+/bt_navigator/get_available_transitions
+/bt_navigator/get_parameter_types
+/bt_navigator/get_parameters
+/bt_navigator/get_state
+/bt_navigator/get_transition_graph
+/bt_navigator/list_parameters
+/bt_navigator/set_parameters
+/bt_navigator/set_parameters_atomically
+/bt_navigator_navigate_through_poses_rclcpp_node/describe_parameters
+/bt_navigator_navigate_through_poses_rclcpp_node/get_parameter_types
+/bt_navigator_navigate_through_poses_rclcpp_node/get_parameters
+/bt_navigator_navigate_through_poses_rclcpp_node/list_parameters
+/bt_navigator_navigate_through_poses_rclcpp_node/set_parameters
+/bt_navigator_navigate_through_poses_rclcpp_node/set_parameters_atomically
+/bt_navigator_navigate_to_pose_rclcpp_node/describe_parameters
+/bt_navigator_navigate_to_pose_rclcpp_node/get_parameter_types
+/bt_navigator_navigate_to_pose_rclcpp_node/get_parameters
+/bt_navigator_navigate_to_pose_rclcpp_node/list_parameters
+/bt_navigator_navigate_to_pose_rclcpp_node/set_parameters
+/bt_navigator_navigate_to_pose_rclcpp_node/set_parameters_atomically
+/controller_server/change_state
+/controller_server/describe_parameters
+/controller_server/get_available_states
+/controller_server/get_available_transitions
+/controller_server/get_parameter_types
+/controller_server/get_parameters
+/controller_server/get_state
+/controller_server/get_transition_graph
+/controller_server/list_parameters
+/controller_server/set_parameters
+/controller_server/set_parameters_atomically
+/demo_detector/describe_parameters
+/demo_detector/get_parameter_types
+/demo_detector/get_parameters
+/demo_detector/list_parameters
+/demo_detector/set_parameters
+/demo_detector/set_parameters_atomically
+/demo_object_manager/describe_parameters
+/demo_object_manager/get_parameter_types
+/demo_object_manager/get_parameters
+/demo_object_manager/list_parameters
+/demo_object_manager/set_parameters
+/demo_object_manager/set_parameters_atomically
+/demo_tracker/describe_parameters
+/demo_tracker/get_parameter_types
+/demo_tracker/get_parameters
+/demo_tracker/list_parameters
+/demo_tracker/set_parameters
+/demo_tracker/set_parameters_atomically
+/depth_gate/describe_parameters
+/depth_gate/get_parameter_types
+/depth_gate/get_parameters
+/depth_gate/list_parameters
+/depth_gate/set_parameters
+/depth_gate/set_parameters_atomically
+/depth_optical2left/describe_parameters
+/depth_optical2left/get_parameter_types
+/depth_optical2left/get_parameters
+/depth_optical2left/list_parameters
+/depth_optical2left/set_parameters
+/depth_optical2left/set_parameters_atomically
+/depth_to_registered_pointcloud/describe_parameters
+/depth_to_registered_pointcloud/get_parameter_types
+/depth_to_registered_pointcloud/get_parameters
+/depth_to_registered_pointcloud/list_parameters
+/depth_to_registered_pointcloud/set_parameters
+/depth_to_registered_pointcloud/set_parameters_atomically
+/global_costmap/clear_around_global_costmap
+/global_costmap/clear_entirely_global_costmap
+/global_costmap/clear_except_global_costmap
+/global_costmap/get_costmap
+/global_costmap/global_costmap/change_state
+/global_costmap/global_costmap/describe_parameters
+/global_costmap/global_costmap/get_available_states
+/global_costmap/global_costmap/get_available_transitions
+/global_costmap/global_costmap/get_parameter_types
+/global_costmap/global_costmap/get_parameters
+/global_costmap/global_costmap/get_state
+/global_costmap/global_costmap/get_transition_graph
+/global_costmap/global_costmap/list_parameters
+/global_costmap/global_costmap/set_parameters
+/global_costmap/global_costmap/set_parameters_atomically
+/imu2Leftcam/describe_parameters
+/imu2Leftcam/get_parameter_types
+/imu2Leftcam/get_parameters
+/imu2Leftcam/list_parameters
+/imu2Leftcam/set_parameters
+/imu2Leftcam/set_parameters_atomically
+/inspection_manager/describe_parameters
+/inspection_manager/get_parameter_types
+/inspection_manager/get_parameters
+/inspection_manager/list_parameters
+/inspection_manager/set_parameters
+/inspection_manager/set_parameters_atomically
+/is_path_valid
+/leftcam2base/describe_parameters
+/leftcam2base/get_parameter_types
+/leftcam2base/get_parameters
+/leftcam2base/list_parameters
+/leftcam2base/set_parameters
+/leftcam2base/set_parameters_atomically
+/lifecycle_manager_navigation/describe_parameters
+/lifecycle_manager_navigation/get_parameter_types
+/lifecycle_manager_navigation/get_parameters
+/lifecycle_manager_navigation/is_active
+/lifecycle_manager_navigation/list_parameters
+/lifecycle_manager_navigation/manage_nodes
+/lifecycle_manager_navigation/set_parameters
+/lifecycle_manager_navigation/set_parameters_atomically
+/local_costmap/clear_around_local_costmap
+/local_costmap/clear_entirely_local_costmap
+/local_costmap/clear_except_local_costmap
+/local_costmap/get_costmap
+/local_costmap/local_costmap/change_state
+/local_costmap/local_costmap/describe_parameters
+/local_costmap/local_costmap/get_available_states
+/local_costmap/local_costmap/get_available_transitions
+/local_costmap/local_costmap/get_parameter_types
+/local_costmap/local_costmap/get_parameters
+/local_costmap/local_costmap/get_state
+/local_costmap/local_costmap/get_transition_graph
+/local_costmap/local_costmap/list_parameters
+/local_costmap/local_costmap/set_parameters
+/local_costmap/local_costmap/set_parameters_atomically
+/map_to_slamware_map/describe_parameters
+/map_to_slamware_map/get_parameter_types
+/map_to_slamware_map/get_parameters
+/map_to_slamware_map/list_parameters
+/map_to_slamware_map/set_parameters
+/map_to_slamware_map/set_parameters_atomically
+/motor_driver_node/describe_parameters
+/motor_driver_node/get_parameter_types
+/motor_driver_node/get_parameters
+/motor_driver_node/list_parameters
+/motor_driver_node/set_parameters
+/motor_driver_node/set_parameters_atomically
+/navigation_permitted_publisher/describe_parameters
+/navigation_permitted_publisher/get_parameter_types
+/navigation_permitted_publisher/get_parameters
+/navigation_permitted_publisher/list_parameters
+/navigation_permitted_publisher/set_parameters
+/navigation_permitted_publisher/set_parameters_atomically
+/odom2map/describe_parameters
+/odom2map/get_parameter_types
+/odom2map/get_parameters
+/odom2map/list_parameters
+/odom2map/set_parameters
+/odom2map/set_parameters_atomically
+/photo_capture/capture
+/photo_capture_api/describe_parameters
+/photo_capture_api/get_parameter_types
+/photo_capture_api/get_parameters
+/photo_capture_api/list_parameters
+/photo_capture_api/set_parameters
+/photo_capture_api/set_parameters_atomically
+/photo_capture_service/describe_parameters
+/photo_capture_service/get_parameter_types
+/photo_capture_service/get_parameters
+/photo_capture_service/list_parameters
+/photo_capture_service/set_parameters
+/photo_capture_service/set_parameters_atomically
+/planner_server/change_state
+/planner_server/describe_parameters
+/planner_server/get_available_states
+/planner_server/get_available_transitions
+/planner_server/get_parameter_types
+/planner_server/get_parameters
+/planner_server/get_state
+/planner_server/get_transition_graph
+/planner_server/list_parameters
+/planner_server/set_parameters
+/planner_server/set_parameters_atomically
+/rightcam2Leftcam/describe_parameters
+/rightcam2Leftcam/get_parameter_types
+/rightcam2Leftcam/get_parameters
+/rightcam2Leftcam/list_parameters
+/rightcam2Leftcam/set_parameters
+/rightcam2Leftcam/set_parameters_atomically
+/rosbag2_recorder/describe_parameters
+/rosbag2_recorder/get_parameter_types
+/rosbag2_recorder/get_parameters
+/rosbag2_recorder/list_parameters
+/rosbag2_recorder/set_parameters
+/rosbag2_recorder/set_parameters_atomically
+/segmentation_processor_tire/describe_parameters
+/segmentation_processor_tire/get_parameter_types
+/segmentation_processor_tire/get_parameters
+/segmentation_processor_tire/list_parameters
+/segmentation_processor_tire/set_parameters
+/segmentation_processor_tire/set_parameters_atomically
+/segmentation_processor_vehicle/describe_parameters
+/segmentation_processor_vehicle/get_parameter_types
+/segmentation_processor_vehicle/get_parameters
+/segmentation_processor_vehicle/list_parameters
+/segmentation_processor_vehicle/set_parameters
+/segmentation_processor_vehicle/set_parameters_atomically
+/slamware_ros_sdk_server_node/describe_parameters
+/slamware_ros_sdk_server_node/get_parameter_types
+/slamware_ros_sdk_server_node/get_parameters
+/slamware_ros_sdk_server_node/list_parameters
+/slamware_ros_sdk_server_node/relocalization
+/slamware_ros_sdk_server_node/set_parameters
+/slamware_ros_sdk_server_node/set_parameters_atomically
+/slamware_ros_sdk_server_node/sync_get_stcm
+/slamware_ros_sdk_server_node/sync_set_stcm
+/smoother_server/change_state
+/smoother_server/describe_parameters
+/smoother_server/get_available_states
+/smoother_server/get_available_transitions
+/smoother_server/get_parameter_types
+/smoother_server/get_parameters
+/smoother_server/get_state
+/smoother_server/get_transition_graph
+/smoother_server/list_parameters
+/smoother_server/set_parameters
+/smoother_server/set_parameters_atomically
+/velocity_smoother/change_state
+/velocity_smoother/describe_parameters
+/velocity_smoother/get_available_states
+/velocity_smoother/get_available_transitions
+/velocity_smoother/get_parameter_types
+/velocity_smoother/get_parameters
+/velocity_smoother/get_state
+/velocity_smoother/get_transition_graph
+/velocity_smoother/list_parameters
+/velocity_smoother/set_parameters
+/velocity_smoother/set_parameters_atomically
+/waypoint_follower/change_state
+/waypoint_follower/describe_parameters
+/waypoint_follower/get_available_states
+/waypoint_follower/get_available_transitions
+/waypoint_follower/get_parameter_types
+/waypoint_follower/get_parameters
+/waypoint_follower/get_state
+/waypoint_follower/get_transition_graph
+/waypoint_follower/list_parameters
+/waypoint_follower/set_parameters
+/waypoint_follower/set_parameters_atomically
+[exit_code=0]
+
+[2026-02-28T02:49:24+00:00] $ source /opt/ros/humble/setup.bash && source install/setup.bash && ros2 action list
+/assisted_teleop
+/backup
+/compute_path_through_poses
+/compute_path_to_pose
+/drive_on_heading
+/follow_path
+/follow_waypoints
+/navigate_through_poses
+/navigate_to_pose
+/smooth_path
+/wait
+[exit_code=0]
+
+[2026-02-28T02:49:26+00:00] $ source /opt/ros/humble/setup.bash && source install/setup.bash && timeout 4 ros2 run tf2_tools view_frames
+[INFO] [1772246969.924042920] [view_frames]: Listening to tf data for 5.0 seconds...
+Traceback (most recent call last):
+  File "/opt/ros/humble/lib/tf2_tools/view_frames", line 33, in <module>
+    sys.exit(load_entry_point('tf2-tools==0.25.18', 'console_scripts', 'view_frames')())
+  File "/opt/ros/humble/lib/python3.10/site-packages/tf2_tools/view_frames.py", line 66, in main
+    rclpy.spin_once(node, timeout_sec=0.1)
+  File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/__init__.py", line 208, in spin_once
+    executor.spin_once(timeout_sec=timeout_sec)
+  File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 773, in spin_once
+    self._spin_once_impl(timeout_sec)
+  File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 762, in _spin_once_impl
+    handler, entity, node = self.wait_for_ready_callbacks(timeout_sec=timeout_sec)
+  File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 745, in wait_for_ready_callbacks
+    return next(self._cb_iter)
+  File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 510, in _wait_for_ready_callbacks
+    timeout_timer = Timer(None, None, timeout_nsec, self._clock, context=self._context)
+  File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/timer.py", line 28, in __init__
+    self.__timer = _rclpy.Timer(
+rclpy._rclpy_pybind11.RCLError: failed to create timer: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+[exit_code=124]
+
+[2026-02-28T02:49:32+00:00] $ source /opt/ros/humble/setup.bash && source install/setup.bash && timeout 5 ros2 topic echo --once /tf_static
+transforms:
+- header:
+    stamp:
+      sec: 1772239235
+      nanosec: 830499652
+    frame_id: camera_left
+  child_frame_id: camera_depth_optical_frame
+  transform:
+    translation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+    rotation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+---
+[exit_code=0]
+
+[2026-02-28T03:26:36+00:00] phase: unify-stack remove-synthetic add-world-model
+- updated launch/inspection_manager.launch.py to manager_node + photo_capture_api
+- added inspection_manager/world_model.py (live vehicle+tire model)
+- replaced manager_node with live nav2/perception flow
+- replaced photo_capture_api synthetic image path with live image capture
+- updated alignment.py to live error convergence
+- updated photo_verifier.py blur + center coverage checks
+- build: colcon build --packages-select inspection_manager_interfaces inspection_manager [OK]
+- test: python3 -m pytest .../test_*_refactor.py [3 passed]
+- runtime validation: /inspection_manager/start_mission is srv, /photo_capture/capture is srv, /inspection_manager/mission_status is msg topic
+

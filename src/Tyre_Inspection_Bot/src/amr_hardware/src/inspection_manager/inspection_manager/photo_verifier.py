@@ -17,11 +17,15 @@ class PhotoVerifier:
         min_edges: int = 400,
         min_keypoints: int = 30,
         min_overlap: float = 0.6,
+        min_blur_var: float = 80.0,
+        min_center_coverage: float = 0.2,
     ) -> None:
         self.min_file_bytes = min_file_bytes
         self.min_edges = min_edges
         self.min_keypoints = min_keypoints
         self.min_overlap = min_overlap
+        self.min_blur_var = min_blur_var
+        self.min_center_coverage = min_center_coverage
 
     @staticmethod
     def _metadata_ok(metadata: Dict[str, Any]) -> bool:
@@ -38,6 +42,9 @@ class PhotoVerifier:
         overlap = float(metadata.get("projection_overlap", 0.0))
         if overlap < self.min_overlap:
             return False
+        center_cov = float(metadata.get("tire_center_coverage", 1.0))
+        if center_cov < self.min_center_coverage:
+            return False
         if cv2 is None:
             return True
         img = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)
@@ -49,5 +56,8 @@ class PhotoVerifier:
         corners = cv2.goodFeaturesToTrack(img, 200, 0.01, 8)
         kp_count = 0 if corners is None else len(corners)
         if kp_count < self.min_keypoints:
+            return False
+        blur_var = float(cv2.Laplacian(img, cv2.CV_64F).var())
+        if blur_var < self.min_blur_var:
             return False
         return True

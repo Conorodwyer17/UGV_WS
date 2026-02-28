@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
-"""Service endpoint for `/photo_capture/capture`."""
+"""Live camera-backed service endpoint for `/photo_capture/capture`."""
 
 import json
 import os
 from datetime import datetime, timezone
+from typing import Optional
 
+import cv2
+from cv_bridge import CvBridge
+from geometry_msgs.msg import TransformStamped
 import rclpy
 from rclpy.node import Node
+from sensor_msgs.msg import CameraInfo, Image
+from tf2_ros import Buffer, TransformListener
 
 from inspection_manager_interfaces.srv import CapturePhoto
 
@@ -15,38 +21,101 @@ class PhotoCaptureApi(Node):
     def __init__(self) -> None:
         super().__init__("photo_capture_api")
         self.declare_parameter("output_root", "research/data/photos")
+        self.declare_parameter("image_topic", "/slamware_ros_sdk_server_node/left_image_raw")
+        self.declare_parameter("camera_info_topic", "/camera/depth/camera_info")
+        self.declare_parameter("camera_frame", "camera_link")
+        self.declare_parameter("max_image_age_s", 1.0)
         self.output_root = str(self.get_parameter("output_root").value)
+        self.image_topic = str(self.get_parameter("image_topic").value)
+        self.camera_frame = str(self.get_parameter("camera_frame").value)
+        self.max_image_age_s = float(self.get_parameter("max_image_age_s").value)
+
+        self._bridge = CvBridge()
+        self._last_image_msg: Optional[Image] = None
+        self._last_camera_info: Optional[CameraInfo] = None
+        self._last_image_walltime = 0.0
+        self._tf_buffer = Buffer()
+        self._tf_listener = TransformListener(self._tf_buffer, self)
+
+        self.create_subscription(Image, self.image_topic, self._on_image, 10)
+        self.create_subscription(CameraInfo, str(self.get_parameter("camera_info_topic").value), self._on_camera_info, 10)
         self.srv = self.create_service(CapturePhoto, "/photo_capture/capture", self._handle_capture)
-        self.get_logger().info("photo_capture API service ready: /photo_capture/capture")
+        self.get_logger().info(f"photo_capture API ready on /photo_capture/capture from {self.image_topic}")
+
+    def _on_image(self, msg: Image) -> None:
+        self._last_image_msg = msg
+        self._last_image_walltime = self.get_clock().now().nanoseconds / 1e9
+
+    def _on_camera_info(self, msg: CameraInfo) -> None:
+        self._last_camera_info = msg
+
+    def _tf_to_dict(self, tf: TransformStamped) -> dict:
+        return {
+            "translation": {
+                "x": tf.transform.translation.x,
+                "y": tf.transform.translation.y,
+                "z": tf.transform.translation.z,
+            },
+            "rotation": {
+                "x": tf.transform.rotation.x,
+                "y": tf.transform.rotation.y,
+                "z": tf.transform.rotation.z,
+                "w": tf.transform.rotation.w,
+            },
+        }
 
     def _handle_capture(self, req: CapturePhoto.Request, res: CapturePhoto.Response):
         mission_id = req.mission_id or "unknown_mission"
         object_id = req.object_id or "unknown_object"
         tire_id = req.tire_id or "unknown_tire"
         ts = datetime.now(timezone.utc).isoformat()
+        now_s = self.get_clock().now().nanoseconds / 1e9
+        if self._last_image_msg is None or (now_s - self._last_image_walltime) > self.max_image_age_s:
+            res.ok = False
+            res.file_path = ""
+            res.metadata = json.dumps({"reason": "no_fresh_camera_image"})
+            return res
+
         out_dir = os.path.join(self.output_root, mission_id)
         os.makedirs(out_dir, exist_ok=True)
         file_path = os.path.join(out_dir, f"{tire_id}.png")
         try:
-            import cv2
-            import numpy as np
+            frame = self._bridge.imgmsg_to_cv2(self._last_image_msg, desired_encoding="bgr8")
+            ok = cv2.imwrite(file_path, frame)
+            if not ok:
+                raise RuntimeError("cv2.imwrite failed")
+        except Exception as exc:
+            res.ok = False
+            res.file_path = ""
+            res.metadata = json.dumps({"reason": f"capture_write_failed:{exc}"})
+            return res
 
-            img = np.zeros((900, 1600), dtype=np.uint8)
-            cv2.circle(img, (800, 450), 260, 255, 10)
-            cv2.rectangle(img, (620, 300), (980, 600), 180, 6)
-            cv2.line(img, (500, 450), (1100, 450), 255, 3)
-            cv2.imwrite(file_path, img, [int(cv2.IMWRITE_PNG_COMPRESSION), 0])
+        camera_pose_map = {}
+        object_pose_map = {}
+        try:
+            tf_cam = self._tf_buffer.lookup_transform("map", self.camera_frame, rclpy.time.Time())
+            camera_pose_map = self._tf_to_dict(tf_cam)
         except Exception:
-            with open(file_path, "wb") as f:
-                f.write(b"\x01" * (80 * 1024))
+            camera_pose_map = {}
+        try:
+            tf_obj = self._tf_buffer.lookup_transform("map", object_id, rclpy.time.Time())
+            object_pose_map = self._tf_to_dict(tf_obj)
+        except Exception:
+            object_pose_map = {}
 
         metadata = {
             "mission_id": mission_id,
             "vehicle_id": object_id,
             "tire_id": tire_id,
             "timestamp": ts,
-            "pose": {"x": 0.0, "y": 0.0, "z": 0.0},
-            "camera_intrinsics": {},
+            "pose": camera_pose_map,
+            "object_pose_map": object_pose_map,
+            "camera_intrinsics": {
+                "k": list(self._last_camera_info.k) if self._last_camera_info is not None else [],
+                "d": list(self._last_camera_info.d) if self._last_camera_info is not None else [],
+                "width": int(self._last_camera_info.width) if self._last_camera_info is not None else 0,
+                "height": int(self._last_camera_info.height) if self._last_camera_info is not None else 0,
+            },
             "projection_overlap": 0.8,
         }
         with open(os.path.join(out_dir, f"{tire_id}.json"), "w", encoding="utf-8") as f:
