@@ -1,0 +1,6 @@
+.....                                                                    [100%]
+5 passed in 0.60s
+[test] simulated mission replay using latest Aurora capture manifest
+research/logs/metrics/mission_108f6f939c96.json
+[test] done
+All local tests completed.

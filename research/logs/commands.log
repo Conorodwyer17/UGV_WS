@@ -43105,3 +43105,18 @@ bash: line 1: pytest: command not found
 research/logs/metrics/mission_d6cff849343b.json
 [exit_code=0]
 
+[2026-02-28T01:44:07+00:00] $ PYTHONPATH=. python3 -m pytest -q inspection_manager/tests | tee research/test_results/inspection_manager_pytests.txt
+.....                                                                    [100%]
+5 passed in 0.55s
+[exit_code=0]
+
+[2026-02-28T01:50:20+00:00] $ bash scripts/run_all_tests.sh
+[2026-02-28T01:51:34+00:00] $ bash scripts/run_all_tests.sh
+.....                                                                    [100%]
+5 passed in 0.60s
+[test] simulated mission replay using latest Aurora capture manifest
+research/logs/metrics/mission_108f6f939c96.json
+[test] done
+All local tests completed.
+[exit_code=0]
+
