@@ -168,5 +168,39 @@
     "integration_difficulty": "5",
     "recommended_integration_actions": "Use as implementation and validation reference in Jetson integration work.",
     "confidence_flag": "high"
+  },
+  {
+    "title": "ROS2 lifecycle and SQLite persistence references",
+    "url": "https://docs.ros.org/en/rolling/p/lifecycle",
+    "authors_org": "ROS 2 docs",
+    "type": "doc",
+    "code_repo_yes_no": "yes",
+    "ros_package_names": "rclcpp_lifecycle,warehouse_ros_sqlite",
+    "license": "ROS docs license",
+    "tags": "lifecycle,persistence,sqlite",
+    "summary": "Reference for managed node state transitions and persistence-friendly lifecycle behavior in ROS2 mission services.",
+    "exact_file_paths_line_ranges": "lifecycle docs + warehouse_ros_sqlite docs",
+    "integration_difficulty": "4",
+    "recommended_integration_actions": "Adopt lifecycle-safe startup/resume and persistent state transitions for mission manager.",
+    "confidence_flag": "high",
+    "id": "R011",
+    "access_date": "2026-02-28"
+  },
+  {
+    "title": "Nav2 RecoveryNode retry patterns",
+    "url": "https://docs.nav2.org/configuration/packages/bt-plugins/controls/RecoveryNode.html",
+    "authors_org": "Nav2 maintainers",
+    "type": "doc",
+    "code_repo_yes_no": "yes",
+    "ros_package_names": "nav2_bt_navigator",
+    "license": "Nav2 docs license",
+    "tags": "nav2,behavior_tree,recovery,retries",
+    "summary": "Canonical retry control pattern for planner/controller recoveries and bounded retries in Nav2 behavior trees.",
+    "exact_file_paths_line_ranges": "RecoveryNode docs, nav_to_pose_recovery tree docs",
+    "integration_difficulty": "5",
+    "recommended_integration_actions": "Mirror bounded retry semantics in tire approach and final alignment recoveries.",
+    "confidence_flag": "high",
+    "id": "R012",
+    "access_date": "2026-02-28"
   }
 ]

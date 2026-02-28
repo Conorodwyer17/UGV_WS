@@ -1,0 +1,316 @@
+{
+  "mission": {
+    "mission_id": "mission_127aea695cfa",
+    "object_id": "object_4108a0",
+    "state": "COMPLETE",
+    "allow_partial_success": 0,
+    "created_at": "2026-02-28T01:47:57.296451+00:00",
+    "updated_at": "2026-02-28T01:48:10.489728+00:00",
+    "config_json": "{\"max_retries\": 5, \"allow_partial_success\": false}",
+    "failure_reason": ""
+  },
+  "tires": [
+    {
+      "mission_id": "mission_127aea695cfa",
+      "tire_id": "axle1_left",
+      "order_index": 0,
+      "status": "completed",
+      "attempt_count": 1,
+      "last_error": "",
+      "photo_path": "research/data/photos/mission_127aea695cfa/axle1_left.jpg",
+      "photo_metadata_json": "{\"vehicle_id\": \"object_4108a0\", \"tire_id\": \"axle1_left\"}",
+      "updated_at": "2026-02-28T01:48:00.978290+00:00"
+    },
+    {
+      "mission_id": "mission_127aea695cfa",
+      "tire_id": "axle1_right",
+      "order_index": 1,
+      "status": "completed",
+      "attempt_count": 1,
+      "last_error": "",
+      "photo_path": "research/data/photos/mission_127aea695cfa/axle1_right.jpg",
+      "photo_metadata_json": "{\"vehicle_id\": \"object_4108a0\", \"tire_id\": \"axle1_right\"}",
+      "updated_at": "2026-02-28T01:48:03.979262+00:00"
+    },
+    {
+      "mission_id": "mission_127aea695cfa",
+      "tire_id": "axle2_left",
+      "order_index": 2,
+      "status": "completed",
+      "attempt_count": 1,
+      "last_error": "",
+      "photo_path": "research/data/photos/mission_127aea695cfa/axle2_left.jpg",
+      "photo_metadata_json": "{\"vehicle_id\": \"object_4108a0\", \"tire_id\": \"axle2_left\"}",
+      "updated_at": "2026-02-28T01:48:07.481498+00:00"
+    },
+    {
+      "mission_id": "mission_127aea695cfa",
+      "tire_id": "axle2_right",
+      "order_index": 3,
+      "status": "completed",
+      "attempt_count": 1,
+      "last_error": "",
+      "photo_path": "research/data/photos/mission_127aea695cfa/axle2_right.jpg",
+      "photo_metadata_json": "{\"vehicle_id\": \"object_4108a0\", \"tire_id\": \"axle2_right\"}",
+      "updated_at": "2026-02-28T01:48:10.478462+00:00"
+    }
+  ],
+  "events": [
+    {
+      "id": 324,
+      "mission_id": "mission_127aea695cfa",
+      "ts": "2026-02-28T01:47:57.296451+00:00",
+      "state": "DISCOVERY",
+      "event_type": "mission_start",
+      "payload_json": "{\"object_id\": \"object_4108a0\"}"
+    },
+    {
+      "id": 325,
+      "mission_id": "mission_127aea695cfa",
+      "ts": "2026-02-28T01:47:57.364480+00:00",
+      "state": "DISCOVERY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 329,
+      "mission_id": "mission_127aea695cfa",
+      "ts": "2026-02-28T01:47:57.478135+00:00",
+      "state": "TIRE_ENUMERATION",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 333,
+      "mission_id": "mission_127aea695cfa",
+      "ts": "2026-02-28T01:47:57.978148+00:00",
+      "state": "PLAN_APPROACH",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 336,
+      "mission_id": "mission_127aea695cfa",
+      "ts": "2026-02-28T01:47:58.478169+00:00",
+      "state": "NAVIGATE_TO_TIRE",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 339,
+      "mission_id": "mission_127aea695cfa",
+      "ts": "2026-02-28T01:47:58.978225+00:00",
+      "state": "FINAL_ALIGNMENT",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 342,
+      "mission_id": "mission_127aea695cfa",
+      "ts": "2026-02-28T01:47:59.599453+00:00",
+      "state": "CAPTURE",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 345,
+      "mission_id": "mission_127aea695cfa",
+      "ts": "2026-02-28T01:48:00.044147+00:00",
+      "state": "VERIFY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 348,
+      "mission_id": "mission_127aea695cfa",
+      "ts": "2026-02-28T01:48:00.693735+00:00",
+      "state": "POST_PROCESS",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 351,
+      "mission_id": "mission_127aea695cfa",
+      "ts": "2026-02-28T01:48:00.978290+00:00",
+      "state": "COMPLETED",
+      "event_type": "tire_status",
+      "payload_json": "{\"tire_id\": \"axle1_left\", \"status\": \"completed\"}"
+    },
+    {
+      "id": 352,
+      "mission_id": "mission_127aea695cfa",
+      "ts": "2026-02-28T01:48:01.301526+00:00",
+      "state": "PLAN_APPROACH",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 356,
+      "mission_id": "mission_127aea695cfa",
+      "ts": "2026-02-28T01:48:01.478168+00:00",
+      "state": "NAVIGATE_TO_TIRE",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 359,
+      "mission_id": "mission_127aea695cfa",
+      "ts": "2026-02-28T01:48:01.978228+00:00",
+      "state": "FINAL_ALIGNMENT",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 362,
+      "mission_id": "mission_127aea695cfa",
+      "ts": "2026-02-28T01:48:02.598826+00:00",
+      "state": "CAPTURE",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 365,
+      "mission_id": "mission_127aea695cfa",
+      "ts": "2026-02-28T01:48:03.038575+00:00",
+      "state": "VERIFY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 368,
+      "mission_id": "mission_127aea695cfa",
+      "ts": "2026-02-28T01:48:03.682602+00:00",
+      "state": "POST_PROCESS",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 371,
+      "mission_id": "mission_127aea695cfa",
+      "ts": "2026-02-28T01:48:03.979262+00:00",
+      "state": "COMPLETED",
+      "event_type": "tire_status",
+      "payload_json": "{\"tire_id\": \"axle1_right\", \"status\": \"completed\"}"
+    },
+    {
+      "id": 372,
+      "mission_id": "mission_127aea695cfa",
+      "ts": "2026-02-28T01:48:04.000091+00:00",
+      "state": "PLAN_APPROACH",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 376,
+      "mission_id": "mission_127aea695cfa",
+      "ts": "2026-02-28T01:48:04.478196+00:00",
+      "state": "NAVIGATE_TO_TIRE",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 379,
+      "mission_id": "mission_127aea695cfa",
+      "ts": "2026-02-28T01:48:04.978178+00:00",
+      "state": "FINAL_ALIGNMENT",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 381,
+      "mission_id": "mission_127aea695cfa",
+      "ts": "2026-02-28T01:48:05.602094+00:00",
+      "state": "CAPTURE",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 383,
+      "mission_id": "mission_127aea695cfa",
+      "ts": "2026-02-28T01:48:06.670380+00:00",
+      "state": "VERIFY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 388,
+      "mission_id": "mission_127aea695cfa",
+      "ts": "2026-02-28T01:48:07.143289+00:00",
+      "state": "POST_PROCESS",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 391,
+      "mission_id": "mission_127aea695cfa",
+      "ts": "2026-02-28T01:48:07.481498+00:00",
+      "state": "COMPLETED",
+      "event_type": "tire_status",
+      "payload_json": "{\"tire_id\": \"axle2_left\", \"status\": \"completed\"}"
+    },
+    {
+      "id": 392,
+      "mission_id": "mission_127aea695cfa",
+      "ts": "2026-02-28T01:48:07.498816+00:00",
+      "state": "PLAN_APPROACH",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 396,
+      "mission_id": "mission_127aea695cfa",
+      "ts": "2026-02-28T01:48:07.978202+00:00",
+      "state": "NAVIGATE_TO_TIRE",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 399,
+      "mission_id": "mission_127aea695cfa",
+      "ts": "2026-02-28T01:48:08.478213+00:00",
+      "state": "FINAL_ALIGNMENT",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 402,
+      "mission_id": "mission_127aea695cfa",
+      "ts": "2026-02-28T01:48:09.099978+00:00",
+      "state": "CAPTURE",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 405,
+      "mission_id": "mission_127aea695cfa",
+      "ts": "2026-02-28T01:48:09.530372+00:00",
+      "state": "VERIFY",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 408,
+      "mission_id": "mission_127aea695cfa",
+      "ts": "2026-02-28T01:48:10.160915+00:00",
+      "state": "POST_PROCESS",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    },
+    {
+      "id": 411,
+      "mission_id": "mission_127aea695cfa",
+      "ts": "2026-02-28T01:48:10.478462+00:00",
+      "state": "COMPLETED",
+      "event_type": "tire_status",
+      "payload_json": "{\"tire_id\": \"axle2_right\", \"status\": \"completed\"}"
+    },
+    {
+      "id": 412,
+      "mission_id": "mission_127aea695cfa",
+      "ts": "2026-02-28T01:48:10.489728+00:00",
+      "state": "COMPLETE",
+      "event_type": "state_transition",
+      "payload_json": "{\"failure_reason\": \"\"}"
+    }
+  ]
+}
