@@ -1,0 +1,6 @@
+string object_id
+string mission_config_json
+---
+string mission_id
+bool started
+string message

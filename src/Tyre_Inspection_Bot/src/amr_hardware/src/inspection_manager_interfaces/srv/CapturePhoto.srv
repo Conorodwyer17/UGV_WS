@@ -1,0 +1,7 @@
+string mission_id
+string object_id
+string tire_id
+---
+string file_path
+string metadata
+bool ok

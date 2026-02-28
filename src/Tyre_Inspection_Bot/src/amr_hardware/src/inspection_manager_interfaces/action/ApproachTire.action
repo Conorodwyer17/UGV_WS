@@ -1,0 +1,11 @@
+string mission_id
+string object_id
+string tire_id
+float32 offset
+---
+bool success
+string status
+string photo_metadata
+---
+float32 progress
+float32 pose_error

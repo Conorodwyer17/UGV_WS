@@ -43484,3 +43484,57 @@ Requested path src/tire_inspection_bot absent; canonical path resolved to src/Ty
 Inspection search completed using tool-backed ripgrep due shell rg unavailable.
 [exit_code=0]
 
+[2026-02-28T02:26:44+00:00] $ source /opt/ros/humble/setup.bash && colcon build --packages-select tire_inspection_bot
+[1.169s] WARNING:colcon.colcon_core.package_selection:ignoring unknown package 'tire_inspection_bot' in --packages-select
+
+Summary: 0 packages finished [1.14s]
+[exit_code=0]
+
+[2026-02-28T02:26:46+00:00] $ source /opt/ros/humble/setup.bash && colcon build --packages-select inspection_manager_interfaces inspection_manager
+Starting >>> inspection_manager_interfaces
+--- stderr: inspection_manager_interfaces
+CMake Warning:
+  Manually-specified variables were not used by the project:
+
+    CATKIN_INSTALL_INTO_PREFIX_ROOT
+
+
+---
+[Processing: inspection_manager_interfaces]
+Finished <<< inspection_manager_interfaces [51.1s]
+Starting >>> inspection_manager
+Finished <<< inspection_manager [4.96s]
+
+Summary: 2 packages finished [57.0s]
+  1 package had stderr output: inspection_manager_interfaces
+[exit_code=0]
+
+[2026-02-28T02:28:33+00:00] $ bash scripts/run_mission_from_rosbag.sh
+research/data/aurora_samples/aurora_capture_set_20260228_011902_manifest.json
+integration run complete
+[exit_code=0]
+
+[2026-02-28T02:29:23+00:00] $ source /opt/ros/humble/setup.bash && colcon build --packages-select inspection_manager_interfaces inspection_manager
+Starting >>> inspection_manager_interfaces
+Finished <<< inspection_manager_interfaces [2.81s]
+Starting >>> inspection_manager
+Finished <<< inspection_manager [4.00s]
+
+Summary: 2 packages finished [8.25s]
+[exit_code=0]
+
+[2026-02-28T02:29:41+00:00] $ bash scripts/run_mission_from_rosbag.sh
+research/data/aurora_samples/aurora_capture_set_20260228_011902_manifest.json
+integration run complete
+[exit_code=0]
+
+[2026-02-28T02:30:21+00:00] $ bash scripts/run_mission_from_rosbag.sh
+research/data/aurora_samples/aurora_capture_set_20260228_011902_manifest.json
+integration run complete
+[exit_code=0]
+
+[2026-02-28T02:33:29+00:00] $ bash scripts/run_mission_from_rosbag.sh
+/home/conor/ugv_ws/research/data/aurora_samples/aurora_capture_set_20260228_011902_manifest.json
+integration run complete
+[exit_code=0]
+
