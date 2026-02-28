@@ -1,0 +1,5 @@
+string mission_id
+string state
+string current_tire_id
+float32 percent_complete
+string last_event_ts
