@@ -1,0 +1,10 @@
+
+Files:             aurora_sample_20260228_004935_0.db3
+Bag size:          24.5 KiB
+Storage id:        sqlite3
+Duration:          0.000000000s
+Start:             Apr 12 2262 00:47:16.854775807 (9223372036.854775807)
+End:               Apr 12 2262 00:47:16.854775807 (9223372036.854775807)
+Messages:          0
+Topic information: 
+

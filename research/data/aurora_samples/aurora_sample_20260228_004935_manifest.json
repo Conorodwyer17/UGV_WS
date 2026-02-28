@@ -1,0 +1,18 @@
+{
+  "recorded_at": "2026-02-28T00:50:04Z",
+  "bag_dir": "research/data/aurora_samples/aurora_sample_20260228_004935",
+  "files": [
+    {
+      "file": "aurora_sample_20260228_004935_0.db3",
+      "bytes": 24576,
+      "sha256": "d869705bbcac37e482b3ee7151f93e1f4326f5afc734314a1016a6591effc66b"
+    },
+    {
+      "file": "metadata.yaml",
+      "bytes": 529,
+      "sha256": "70b26ddd639623169d2a79069307060e7b688a671e46733ed13f4ce0c67abc75"
+    }
+  ],
+  "storage": "sqlite3",
+  "note": "recorded via timeout --no-discovery"
+}

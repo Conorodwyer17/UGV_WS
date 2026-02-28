@@ -1,0 +1,15 @@
+{
+  "frames": [
+    "base_footprint",
+    "base_link",
+    "camera_depth_optical_frame",
+    "camera_left",
+    "camera_right",
+    "imu_link",
+    "laser",
+    "map",
+    "odom",
+    "slamware_map"
+  ],
+  "object_frames": []
+}

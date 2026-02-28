@@ -14277,3 +14277,30 @@ code map, command logs, failure records, and test result captures."
 ?? src/Tyre_Inspection_Bot/src/amr_hardware/src/segment_3d/segmentation_3d/scripts/print_inspection_model_classes.py
 [exit_code=0]
 
+[2026-02-28T00:48:50+00:00] $ ros2 launch ugv_nav aurora_bringup.launch.py ip_address:=192.168.11.1 use_bridge:=false
+STDOUT: Aurora SDK connected; semantic labels enabled; topics active.
+[exit_code=running/background]
+
+[2026-02-28T00:49:03+00:00] $ ros2 topic list
+STDOUT: includes point_cloud, left/right/depth images, imu_raw_data, odom, semantic_labels, tf.
+[exit_code=0]
+
+[2026-02-28T00:49:03+00:00] $ timeout 20 ros2 bag record ... (sqlite3)
+STDERR: rosbag2_storage_plugins::SqliteException constraint failed
+[exit_code=134]
+
+[2026-02-28T00:49:35+00:00] $ timeout 20 ros2 bag record --no-discovery ...
+STDOUT: recording stopped, bag written to aurora_sample_20260228_004935
+[exit_code=124 timeout expected]
+
+[2026-02-28T00:50:20+00:00] $ python3 serial probe (ESP32)
+STDOUT: captured 160 lines from /dev/ttyTHS1 @ 115200
+[exit_code=0]
+
+[2026-02-28T00:53:03+00:00] $ ros2 run segmentation_3d detection_pipeline_check
+STDOUT: key detection topics present, vehicle/tire 3D bbox topics active.
+[exit_code=0]
+
+[2026-02-28T00:56:46+00:00] $ python3 nodes/object_manager/demo_object_manager_node.py
+STDOUT: subscribed to vehicle boxes; received synthetic + live empty messages
+[exit_code=running/background]

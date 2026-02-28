@@ -1,0 +1,10 @@
+
+Files:             aurora_left_20260228_010125_0.db3
+Bag size:          40.5 MiB
+Storage id:        sqlite3
+Duration:          4.023925593s
+Start:             Feb 28 2026 01:01:33.900509940 (1772240493.900509940)
+End:               Feb 28 2026 01:01:37.924435533 (1772240497.924435533)
+Messages:          46
+Topic information: Topic: /slamware_ros_sdk_server_node/left_image_raw | Type: sensor_msgs/msg/Image | Count: 46 | Serialization Format: cdr
+

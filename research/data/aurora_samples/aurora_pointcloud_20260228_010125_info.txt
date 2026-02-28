@@ -1,0 +1,10 @@
+
+Files:             aurora_pointcloud_20260228_010125_0.db3
+Bag size:          301.0 KiB
+Storage id:        sqlite3
+Duration:          4.094227421s
+Start:             Feb 28 2026 01:01:27.471149286 (1772240487.471149286)
+End:               Feb 28 2026 01:01:31.565376707 (1772240491.565376707)
+Messages:          62
+Topic information: Topic: /slamware_ros_sdk_server_node/point_cloud | Type: sensor_msgs/msg/PointCloud2 | Count: 62 | Serialization Format: cdr
+
