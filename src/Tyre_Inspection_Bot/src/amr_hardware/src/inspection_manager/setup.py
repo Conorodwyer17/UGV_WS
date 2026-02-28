@@ -25,6 +25,7 @@ setup(
             "photo_capture_service = inspection_manager.photo_capture_service:main",
             "manager_node = inspection_manager.manager_node:main",
             "photo_capture_api = inspection_manager.photo_capture_api:main",
+            "visual_servo_align_server = inspection_manager.alignment:main",
         ],
     },
 )

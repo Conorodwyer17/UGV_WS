@@ -13,15 +13,14 @@ from gb_visual_detection_3d_msgs.msg import BoundingBoxes3d
 from nav2_msgs.action import NavigateToPose
 import rclpy
 from rclpy.action import ActionClient
-from rclpy.duration import Duration
 from rclpy.node import Node
 from tf2_ros import Buffer, TransformListener
 
-from inspection_manager.alignment import AlignmentController
 from inspection_manager.approach_planner import ApproachPlanner
 from inspection_manager.photo_verifier import PhotoVerifier
 from inspection_manager.state_persistence import MissionStatePersistence
 from inspection_manager.world_model import WorldModel
+from inspection_manager_interfaces.action import AlignTire
 from inspection_manager_interfaces.msg import MissionStatus
 from inspection_manager_interfaces.srv import CapturePhoto, StartMission
 
@@ -62,26 +61,29 @@ class InspectionManagerUnified(Node):
         self.declare_parameter("reacquire_timeout_s", 10.0)
         self.declare_parameter("alignment_tolerance_cm", 5.0)
         self.declare_parameter("alignment_timeout_s", 6.0)
-        self.declare_parameter("alignment_target_dist_m", 0.35)
+        self.declare_parameter("alignment_pos_rms_m", 0.05)
+        self.declare_parameter("alignment_ang_deg", 3.0)
+        self.declare_parameter("alignment_min_quality", 0.9)
         self.declare_parameter("navigate_timeout_s", 45.0)
         self.declare_parameter("approach_offset", 0.6)
         self.vehicle_labels = [str(x).strip() for x in self.get_parameter("vehicle_labels").value]
         self.vehicle_min_prob = float(self.get_parameter("vehicle_min_prob").value)
         self.tire_min_prob = float(self.get_parameter("tire_min_prob").value)
         self.reacquire_timeout_s = float(self.get_parameter("reacquire_timeout_s").value)
-        self.alignment_tolerance_cm = float(self.get_parameter("alignment_tolerance_cm").value)
         self.alignment_timeout_s = float(self.get_parameter("alignment_timeout_s").value)
-        self.alignment_target_dist_m = float(self.get_parameter("alignment_target_dist_m").value)
+        self.alignment_pos_rms_m = float(self.get_parameter("alignment_pos_rms_m").value)
+        self.alignment_ang_deg = float(self.get_parameter("alignment_ang_deg").value)
+        self.alignment_min_quality = float(self.get_parameter("alignment_min_quality").value)
         self.navigate_timeout_s = float(self.get_parameter("navigate_timeout_s").value)
 
         self.persistence = MissionStatePersistence()
         self.planner = ApproachPlanner(standoff_m=float(self.get_parameter("approach_offset").value))
-        self.alignment = AlignmentController()
         self.verifier = PhotoVerifier()
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
         self.world_model = WorldModel(self, self.tf_buffer)
         self.navigate_client = ActionClient(self, NavigateToPose, "/navigate_to_pose")
+        self.align_client = ActionClient(self, AlignTire, "/visual_servo/align")
         self.current_tire_attempt = 0
         self.last_reacquire_start_s = 0.0
 
@@ -216,26 +218,52 @@ class InspectionManagerUnified(Node):
             return False
         return int(result_future.result().status) == int(GoalStatus.STATUS_SUCCEEDED)
 
-    def _robot_pose_map(self) -> Optional[Dict[str, float]]:
-        try:
-            tf = self.tf_buffer.lookup_transform("map", "base_link", rclpy.time.Time(), timeout=Duration(seconds=0.1))
-            return {
-                "x": tf.transform.translation.x,
-                "y": tf.transform.translation.y,
-                "z": tf.transform.translation.z,
-            }
-        except Exception:
-            return None
+    def _align_tire(self, tire: Dict) -> bool:
+        if not self.align_client.wait_for_server(timeout_sec=2.0):
+            self.get_logger().error("visual_servo align action server unavailable")
+            return False
+        goal = AlignTire.Goal()
+        goal.mission_id = self.current_mission_id
+        goal.object_id = self.target_vehicle_id or self.requested_object_id
+        goal.tire_id = tire["tire_id"]
+        goal.target_x = float(tire["position"]["x"])
+        goal.target_y = float(tire["position"]["y"])
+        goal.target_yaw_rad = float(tire.get("goal", {}).get("yaw_rad", 0.0))
 
-    def _alignment_error(self, tire: Dict) -> float:
-        robot = self._robot_pose_map()
-        live = self.world_model.get_tire(self.target_vehicle_id, tire["tire_id"]) or tire
-        if robot is None:
-            return 999.0
-        tx = float(live["position"]["x"])
-        ty = float(live["position"]["y"])
-        dist = math.sqrt((tx - robot["x"]) ** 2 + (ty - robot["y"]) ** 2)
-        return abs(dist - self.alignment_target_dist_m)
+        latest_fb = {"position_rms": 999.0, "angular_deg": 999.0, "control_quality": 0.0}
+
+        def _on_feedback(msg):
+            fb = msg.feedback
+            latest_fb["position_rms"] = float(fb.position_rms)
+            latest_fb["angular_deg"] = float(fb.angular_deg)
+            latest_fb["control_quality"] = float(fb.control_quality)
+
+        send_future = self.align_client.send_goal_async(goal, feedback_callback=_on_feedback)
+        rclpy.spin_until_future_complete(self, send_future, timeout_sec=3.0)
+        goal_handle = send_future.result()
+        if goal_handle is None or not goal_handle.accepted:
+            self.get_logger().error("visual_servo align goal rejected")
+            return False
+        result_future = goal_handle.get_result_async()
+        rclpy.spin_until_future_complete(self, result_future, timeout_sec=self.alignment_timeout_s)
+        if result_future.result() is None:
+            self.get_logger().error("visual_servo align timed out")
+            goal_handle.cancel_goal_async()
+            return False
+        result = result_future.result()
+        if int(result.status) != int(GoalStatus.STATUS_SUCCEEDED):
+            return False
+        r = result.result
+        tire["final_pose_error"] = {
+            "position_rms": float(r.position_rms),
+            "angular_deg": float(r.angular_deg),
+            "control_quality": float(r.control_quality),
+        }
+        return (
+            float(r.position_rms) <= self.alignment_pos_rms_m
+            and float(r.angular_deg) <= self.alignment_ang_deg
+            and float(r.control_quality) >= self.alignment_min_quality
+        )
 
     def _tick(self) -> None:
         if not self.current_mission_id:
@@ -286,11 +314,7 @@ class InspectionManagerUnified(Node):
         elif self.state == MissionState.FINAL_ALIGNMENT:
             tire = self.tires[self.current_tire_index]
             tire["attempt_count"] = int(tire.get("attempt_count", 0)) + 1
-            ok = self.alignment.converge_until(
-                error_fn=lambda: self._alignment_error(tire),
-                tolerance_cm=self.alignment_tolerance_cm,
-                timeout_s=self.alignment_timeout_s,
-            )
+            ok = self._align_tire(tire)
             if ok:
                 self.state = MissionState.CAPTURE
             else:

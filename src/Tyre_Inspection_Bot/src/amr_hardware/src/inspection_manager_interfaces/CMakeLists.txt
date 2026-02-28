@@ -9,6 +9,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/StartMission.srv"
   "srv/CapturePhoto.srv"
   "action/ApproachTire.action"
+  "action/AlignTire.action"
 )
 
 ament_export_dependencies(rosidl_default_runtime)

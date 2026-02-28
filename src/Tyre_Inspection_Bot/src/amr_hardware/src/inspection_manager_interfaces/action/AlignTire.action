@@ -1,0 +1,16 @@
+string mission_id
+string object_id
+string tire_id
+float32 target_x
+float32 target_y
+float32 target_yaw_rad
+---
+bool success
+string status
+float32 position_rms
+float32 angular_deg
+float32 control_quality
+---
+float32 position_rms
+float32 angular_deg
+float32 control_quality

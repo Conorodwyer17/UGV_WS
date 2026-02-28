@@ -55,5 +55,11 @@ def generate_launch_description():
                     }
                 ],
             ),
+            Node(
+                package="inspection_manager",
+                executable="visual_servo_align_server",
+                name="visual_servo_align_server",
+                output="screen",
+            ),
         ]
     )

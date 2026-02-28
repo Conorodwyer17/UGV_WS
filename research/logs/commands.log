@@ -44048,3 +44048,108 @@ transforms:
 - test: python3 -m pytest .../test_*_refactor.py [3 passed]
 - runtime validation: /inspection_manager/start_mission is srv, /photo_capture/capture is srv, /inspection_manager/mission_status is msg topic
 
+[2026-02-28T03:36:30+00:00] $ git checkout -b feature/inspection_manager/visual_servo || git checkout feature/inspection_manager/visual_servo
+Switched to a new branch 'feature/inspection_manager/visual_servo'
+[exit_code=0]
+
+[2026-02-28T03:36:30+00:00] $ git branch --list feature/inspection_manager/continuity
+
+[exit_code=0]
+
+[2026-02-28T03:36:30+00:00] $ git branch --list feature/inspection_manager/metrics
+
+[exit_code=0]
+
+[2026-02-28T03:36:30+00:00] $ git branch --list feature/inspection_manager/release
+
+[exit_code=0]
+
+[2026-02-28T03:36:30+00:00] $ git branch --show-current
+feature/inspection_manager/visual_servo
+[exit_code=0]
+
+[2026-02-28T03:36:35+00:00] $ git branch feature/inspection_manager/continuity
+
+[exit_code=0]
+
+[2026-02-28T03:36:35+00:00] $ git branch feature/inspection_manager/metrics
+
+[exit_code=0]
+
+[2026-02-28T03:36:35+00:00] $ git branch feature/inspection_manager/release
+
+[exit_code=0]
+
+[2026-02-28T03:36:35+00:00] $ git branch --list 'feature/inspection_manager/*'
+  feature/inspection_manager/continuity
+  feature/inspection_manager/core
+  feature/inspection_manager/metrics
+  feature/inspection_manager/persistence
+  feature/inspection_manager/port
+  feature/inspection_manager/port_plan
+  feature/inspection_manager/release
+  feature/inspection_manager/spec
+  feature/inspection_manager/verification
+* feature/inspection_manager/visual_servo
+[exit_code=0]
+
+[2026-02-28T03:44:53+00:00] $ source /opt/ros/humble/setup.bash && colcon build --packages-select inspection_manager_interfaces inspection_manager
+Starting >>> inspection_manager_interfaces
+[Processing: inspection_manager_interfaces]
+[Processing: inspection_manager_interfaces]
+Finished <<< inspection_manager_interfaces [1min 3s]
+Starting >>> inspection_manager
+Finished <<< inspection_manager [4.35s]
+
+Summary: 2 packages finished [1min 9s]
+[exit_code=0]
+
+[2026-02-28T03:46:03+00:00] $ source /opt/ros/humble/setup.bash && source install/setup.bash && python3 -m pytest -q src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/test/test_alignment_refactor.py src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/test/test_state_persistence_refactor.py src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/test/test_tire_enumerator_refactor.py src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/test/test_photo_verifier_refactor.py
+FF...                                                                    [100%]
+=================================== FAILURES ===================================
+______________ test_alignment_converges_with_good_feedback_stream ______________
+
+    def test_alignment_converges_with_good_feedback_stream():
+        stream = [
+            (0.12, 8.0, 0.7),
+            (0.08, 5.0, 0.85),
+            (0.049, 2.8, 0.92),
+            (0.045, 2.7, 0.95),
+            (0.044, 2.5, 0.96),
+        ]
+        hits = 0
+        for p, a, q in stream:
+>           if AlignmentController.is_converged(p, a, q):
+E           AttributeError: type object 'AlignmentController' has no attribute 'is_converged'
+
+src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/test/test_alignment_refactor.py:14: AttributeError
+__________________ test_alignment_rejects_poor_quality_stream __________________
+
+    def test_alignment_rejects_poor_quality_stream():
+        stream = [
+            (0.03, 2.0, 0.70),
+            (0.03, 2.0, 0.75),
+            (0.03, 2.0, 0.80),
+        ]
+>       assert all(not AlignmentController.is_converged(p, a, q) for p, a, q in stream)
+
+src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/test/test_alignment_refactor.py:27: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+.0 = <list_iterator object at 0xffffa570fca0>
+
+>   assert all(not AlignmentController.is_converged(p, a, q) for p, a, q in stream)
+E   AttributeError: type object 'AlignmentController' has no attribute 'is_converged'
+
+src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/test/test_alignment_refactor.py:27: AttributeError
+=========================== short test summary info ============================
+FAILED src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/test/test_alignment_refactor.py::test_alignment_converges_with_good_feedback_stream
+FAILED src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/test/test_alignment_refactor.py::test_alignment_rejects_poor_quality_stream
+2 failed, 3 passed in 0.48s
+[exit_code=1]
+
+[2026-02-28T03:46:17+00:00] $ source /opt/ros/humble/setup.bash && source install/setup.bash && PYTHONPATH=/home/conor/ugv_ws/install/inspection_manager/lib/python3.10/site-packages:/home/conor/ugv_ws/install/inspection_manager_interfaces/local/lib/python3.10/dist-packages:/home/conor/ugv_ws/build/ugv_vision:/home/conor/ugv_ws/install/ugv_vision/lib/python3.10/site-packages:/home/conor/ugv_ws/build/ugv_base_driver:/home/conor/ugv_ws/install/ugv_base_driver/lib/python3.10/site-packages:/home/conor/ugv_ws/install/slamware_ros_sdk/local/lib/python3.10/dist-packages:/home/conor/ugv_ws/install/segmentation_msgs/local/lib/python3.10/dist-packages:/home/conor/ugv_ws/install/inspection_manager/lib/python3.10/site-packages:/home/conor/ugv_ws/install/gb_visual_detection_3d_msgs/local/lib/python3.10/dist-packages:/opt/ros/humble/lib/python3.10/site-packages:/opt/ros/humble/local/lib/python3.10/dist-packages python3 -m pytest -q src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/test/test_alignment_refactor.py
+/opt/ros/humble/setup.bash: -c: line 1: unexpected EOF while looking for matching `"'
+/opt/ros/humble/setup.bash: -c: line 2: syntax error: unexpected end of file
+[exit_code=2]
+
