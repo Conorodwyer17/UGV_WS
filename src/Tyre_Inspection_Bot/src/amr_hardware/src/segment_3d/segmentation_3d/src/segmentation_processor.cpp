@@ -8,6 +8,15 @@
 #include <chrono>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
+namespace {
+// Canonical wheel class; accept tire/tyre aliases for backward compatibility
+bool is_wheel_class(const std::string& class_lower) {
+    return class_lower == "wheel" || class_lower == "tire" || class_lower == "tyre" ||
+           class_lower == "car-tire" || class_lower == "car_tire" ||
+           class_lower == "car-tyre" || class_lower == "car_tyre";
+}
+}  // namespace
+
 SegmentationProcessor::SegmentationProcessor() : Node("segmentation_processor_node") {
     tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
@@ -40,8 +49,25 @@ SegmentationProcessor::SegmentationProcessor() : Node("segmentation_processor_no
         [this](const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
             latest_pointcloud_ = msg;
         });
+
+    // Publish empty boxes at 2 Hz so inspection_manager startup sees detection_topic alive
+    heartbeat_timer_ = this->create_wall_timer(
+        std::chrono::milliseconds(500),
+        std::bind(&SegmentationProcessor::heartbeatTimerCallback, this));
     
     RCLCPP_WARN(this->get_logger(), "SegmentationProcessor initialized");
+}
+
+void SegmentationProcessor::heartbeatTimerCallback() {
+    // Only publish empty heartbeat when no recent detections (avoid overwriting real wheel boxes)
+    auto elapsed = std::chrono::steady_clock::now() - last_detection_publish_time_;
+    if (std::chrono::duration<double>(elapsed).count() < 2.0) {
+        return;
+    }
+    gb_visual_detection_3d_msgs::msg::BoundingBoxes3d msg;
+    msg.header.stamp = this->now();
+    msg.header.frame_id = working_frame_;
+    boxes3d_pub_->publish(msg);
 }
 
 void SegmentationProcessor::initParams() {
@@ -53,9 +79,9 @@ void SegmentationProcessor::initParams() {
     working_frame_ = "map";
     mininum_detection_threshold_ = 0.5f;
     minimum_probability_ = 0.3f;
-    min_valid_points_tire_ = 3;
-    tire_cluster_tolerance_ = 0.18f;
-    tire_max_distance_m_ = 12.0f;
+    min_valid_points_wheel_ = 3;
+    wheel_cluster_tolerance_ = 0.18f;
+    wheel_max_distance_m_ = 12.0f;
 
     this->declare_parameter("input_segment_topic", input_segment_topic_);
     this->declare_parameter("output_bbx3d_topic", output_bbx3d_topic_);
@@ -65,14 +91,16 @@ void SegmentationProcessor::initParams() {
     this->declare_parameter("working_frame", working_frame_);
     this->declare_parameter("mininum_detection_threshold", mininum_detection_threshold_);
     this->declare_parameter("minimum_probability", minimum_probability_);
-    this->declare_parameter("min_valid_points_tire", min_valid_points_tire_);
-    this->declare_parameter("tire_cluster_tolerance", tire_cluster_tolerance_);
-    this->declare_parameter("tire_max_distance_m", tire_max_distance_m_);
-    this->declare_parameter("interested_classes", std::vector<std::string>{"car", "truck", "car-tire"});
+    this->declare_parameter("min_valid_points_wheel", min_valid_points_wheel_);
+    this->declare_parameter("wheel_cluster_tolerance", wheel_cluster_tolerance_);
+    this->declare_parameter("wheel_max_distance_m", wheel_max_distance_m_);
+    this->declare_parameter("interested_classes", std::vector<std::string>{"car", "truck", "bus", "wheel", "tire", "tyre"});
     this->declare_parameter("min_valid_points", 5);
     this->declare_parameter("tf_max_age_ms", 250);
     this->declare_parameter("segment_image_width", 640);   // Aurora left_image_raw 640x480
     this->declare_parameter("segment_image_height", 480);
+    this->declare_parameter("voxel_leaf_size", 0.0);  // 0 = adaptive; 0.02-0.05 for vehicles
+    this->declare_parameter("pointcloud_max_age_s", 0.5);  // 0 = disabled; reject stale cloud (depth dropout defense)
 
     this->get_parameter("input_segment_topic", input_segment_topic_);
     this->get_parameter("output_bbx3d_topic", output_bbx3d_topic_);
@@ -82,39 +110,49 @@ void SegmentationProcessor::initParams() {
     this->get_parameter("working_frame", working_frame_);
     this->get_parameter("mininum_detection_threshold", mininum_detection_threshold_);
     this->get_parameter("minimum_probability", minimum_probability_);
-    this->get_parameter("min_valid_points_tire", min_valid_points_tire_);
-    this->get_parameter("tire_cluster_tolerance", tire_cluster_tolerance_);
-    this->get_parameter("tire_max_distance_m", tire_max_distance_m_);
+    this->get_parameter("min_valid_points_wheel", min_valid_points_wheel_);
+    this->get_parameter("wheel_cluster_tolerance", wheel_cluster_tolerance_);
+    this->get_parameter("wheel_max_distance_m", wheel_max_distance_m_);
     this->get_parameter("interested_classes", interested_classes_);
     this->get_parameter("min_valid_points", min_valid_points_);
     this->get_parameter("tf_max_age_ms", tf_max_age_ms_);
     this->get_parameter("segment_image_width", segment_image_width_);
     this->get_parameter("segment_image_height", segment_image_height_);
+    this->get_parameter("voxel_leaf_size", voxel_leaf_size_);
+    this->get_parameter("pointcloud_max_age_s", pointcloud_max_age_s_);
     last_tf_warn_time_ = rclcpp::Time(0);
+    last_detection_publish_time_ = std::chrono::steady_clock::time_point{};
 
     RCLCPP_WARN(this->get_logger(),
-        "Parameters initialized (interested_classes: %zu, min_valid_points: %d, min_valid_points_tire: %d, segment_image: %dx%d)",
-        interested_classes_.size(), min_valid_points_, min_valid_points_tire_, segment_image_width_, segment_image_height_);
+        "Parameters initialized (interested_classes: %zu, min_valid_points: %d, min_valid_points_wheel: %d, segment_image: %dx%d)",
+        interested_classes_.size(), min_valid_points_, min_valid_points_wheel_, segment_image_width_, segment_image_height_);
 }
 
 void SegmentationProcessor::segmentationCallback(const segmentation_msgs::msg::ObjectsSegment::SharedPtr msg) {
     rclcpp::Time segment_stamp = msg->header.stamp;
 
-
-    RCLCPP_WARN(this->get_logger(), "Segmentation callback of segment");
-    
     // Use the latest pointcloud
     if (!latest_pointcloud_) {
         RCLCPP_WARN(this->get_logger(), "No PointCloud2 message available");
-        RCLCPP_WARN(this->get_logger(), "No Match point cloud ");
-
         return;
     }
-        RCLCPP_WARN(this->get_logger(), "Callback not returned ");
 
     sensor_msgs::msg::PointCloud2::SharedPtr closest_pointcloud_msg = latest_pointcloud_;
-    
-    RCLCPP_WARN(this->get_logger(), "Found matching PointCloud2 message");
+
+    // Reject stale pointcloud (depth dropout defense; failure_injection_defense_report #3)
+    if (pointcloud_max_age_s_ > 0.0) {
+        try {
+            double age_s = (this->now() - rclcpp::Time(closest_pointcloud_msg->header.stamp)).seconds();
+            if (age_s > pointcloud_max_age_s_) {
+                RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
+                    "pointcloud_stale: age %.2fs > max %.2fs; skipping",
+                    age_s, pointcloud_max_age_s_);
+                return;
+            }
+        } catch (const std::exception&) {
+            // Clock mismatch; skip age check
+        }
+    }
 
     sensor_msgs::msg::PointCloud2 local_pointcloud;
     try {
@@ -226,14 +264,16 @@ void SegmentationProcessor::segmentationCallback(const segmentation_msgs::msg::O
         }
     }
 
-    // Only publish if we have bounding boxes
+    // Always publish (even when empty) so inspection_manager startup sees detection_topic alive
     if (!boxes3d_msg.bounding_boxes.empty()) {
-        boxes3d_pub_->publish(boxes3d_msg);
+        last_detection_publish_time_ = std::chrono::steady_clock::now();
         publish_markers(boxes3d_msg);
         RCLCPP_INFO(this->get_logger(), "Published %zu 3D bounding boxes", boxes3d_msg.bounding_boxes.size());
     } else {
-        RCLCPP_WARN(this->get_logger(), "No 3D bounding boxes computed from %zu segmented objects", msg->objects.size());
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
+            "No 3D bounding boxes computed from %zu segmented objects", msg->objects.size());
     }
+    boxes3d_pub_->publish(boxes3d_msg);
     
     publish_debug_pointcloud(debug_cloud);
     debug_markers_pub_->publish(center_markers_);
@@ -295,8 +335,8 @@ void SegmentationProcessor::calculate_boxes(const sensor_msgs::msg::PointCloud2&
     int required_points = min_valid_points_;
     std::string class_lower = object_segment.class_name;
     std::transform(class_lower.begin(), class_lower.end(), class_lower.begin(), ::tolower);
-    if (class_lower == "car-tire" || class_lower == "tire") {
-        required_points = min_valid_points_tire_;
+    if (is_wheel_class(class_lower)) {
+        required_points = min_valid_points_wheel_;
     }
     if (valid_points == 0 || valid_points < required_points) {
         RCLCPP_WARN(this->get_logger(), "Insufficient valid points for object %s: %d (min %d)",
@@ -309,10 +349,10 @@ void SegmentationProcessor::calculate_boxes(const sensor_msgs::msg::PointCloud2&
     RCLCPP_INFO(this->get_logger(), "Extracted %d valid points for object: %s", valid_points, object_segment.class_name.c_str());
 
 
-    // Step 3-4: Segment the ground plane
+    // Step 3-4: Segment the ground plane (skip for wheels: wheel face can be largest plane and would be removed)
     pcl::PointCloud<pcl::PointXYZ>::Ptr segmented_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-    int number_of_planes = 1;  // Segment one plane (ground)
-    if (!segment_cloud(object_cloud, segmented_cloud, number_of_planes)) {
+    int number_of_planes = is_wheel_class(class_lower) ? 0 : 1;
+    if (!segment_cloud(object_cloud, segmented_cloud, number_of_planes, voxel_leaf_size_)) {
         RCLCPP_WARN(this->get_logger(), "Failed to segment point cloud for object: %s", object_segment.class_name.c_str());
         return;
     }
@@ -325,16 +365,23 @@ void SegmentationProcessor::calculate_boxes(const sensor_msgs::msg::PointCloud2&
     // Step 5: Cluster the segmented cloud
     pcl::PointCloud<pcl::PointXYZ>::Ptr best_cluster(new pcl::PointCloud<pcl::PointXYZ>);
     double cluster_tolerance = 0.1;  // default clustering tolerance
-    int min_cluster_size = std::min(50, static_cast<int>(segmented_cloud->points.size() / 10));  // Adaptive min cluster size
-    if (class_lower == "car-tire" || class_lower == "tire") {
-        cluster_tolerance = tire_cluster_tolerance_;
-        min_cluster_size = std::max(min_valid_points_tire_, std::min(20, static_cast<int>(segmented_cloud->points.size() / 12)));
+    int min_cluster_size = std::min(50, static_cast<int>(segmented_cloud->points.size() / 10));
+    if (is_wheel_class(class_lower)) {
+        cluster_tolerance = wheel_cluster_tolerance_;
+        // Wheels: very relaxed clustering for sparse depth at distance (1-2 points can be valid)
+        min_cluster_size = 1;
     }
     int max_cluster_size = 40000;
     if (!cluster_cloud(segmented_cloud, best_cluster, cluster_tolerance, min_cluster_size, max_cluster_size)) {
-        RCLCPP_WARN(this->get_logger(), "Failed to cluster point cloud for object: %s (segmented cloud had %zu points)", 
-                   object_segment.class_name.c_str(), segmented_cloud->points.size());
-        return;
+        if (is_wheel_class(class_lower) && !segmented_cloud->points.empty()) {
+            // Fallback for wheels: use all points as cluster when clustering fails (sparse depth at distance)
+            *best_cluster = *segmented_cloud;
+            RCLCPP_DEBUG(this->get_logger(), "Wheel cluster fallback: using all %zu points", segmented_cloud->points.size());
+        } else {
+            RCLCPP_WARN(this->get_logger(), "Failed to cluster point cloud for object: %s (segmented cloud had %zu points)",
+                       object_segment.class_name.c_str(), segmented_cloud->points.size());
+            return;
+        }
     }
 
     if (best_cluster->points.empty()) {
@@ -362,11 +409,11 @@ void SegmentationProcessor::calculate_boxes(const sensor_msgs::msg::PointCloud2&
         miny = std::min(point.y, miny);
         minz = std::min(point.z, minz);
     }
-    if (class_lower == "car-tire" || class_lower == "tire") {
-        float max_range = tire_max_distance_m_;
+    if (is_wheel_class(class_lower)) {
+        float max_range = wheel_max_distance_m_;
         float max_xy = std::max(std::max(std::abs(maxx), std::abs(minx)), std::max(std::abs(maxy), std::abs(miny)));
         if (max_xy > max_range) {
-            RCLCPP_WARN(this->get_logger(), "Tire box exceeds max distance %.1fm (max_xy=%.2f), skipping",
+            RCLCPP_WARN(this->get_logger(), "Wheel box exceeds max distance %.1fm (max_xy=%.2f), skipping",
                 max_range, max_xy);
             return;
         }
