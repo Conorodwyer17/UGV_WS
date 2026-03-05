@@ -1,6 +1,8 @@
 #include "segmentation_processor.h"
 #include "point_processor.hpp"
+#include <rclcpp/executors.hpp>
 #include <pcl_conversions/pcl_conversions.h>
+#include <pcl/filters/statistical_outlier_removal.h>
 #include <limits>
 #include <numeric>
 #include <algorithm>
@@ -22,10 +24,16 @@ SegmentationProcessor::SegmentationProcessor() : Node("segmentation_processor_no
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
     
     initParams();
-    
+
+    // Callback group: isolate heavy segmentation work so heartbeat/timers can run in parallel (system_reaudit_report)
+    segmentation_callback_group_ = this->create_callback_group(
+        rclcpp::CallbackGroupType::MutuallyExclusive);
+    rclcpp::SubscriptionOptions sub_opts;
+    sub_opts.callback_group = segmentation_callback_group_;
     segmentation_sub_ = this->create_subscription<segmentation_msgs::msg::ObjectsSegment>(
         input_segment_topic_, 10,
-        std::bind(&SegmentationProcessor::segmentationCallback, this, std::placeholders::_1));
+        std::bind(&SegmentationProcessor::segmentationCallback, this, std::placeholders::_1),
+        sub_opts);
     
     // Use BEST_EFFORT QoS to match inspection manager subscriber
     rclcpp::QoS pub_qos_profile(100);
@@ -101,6 +109,9 @@ void SegmentationProcessor::initParams() {
     this->declare_parameter("segment_image_height", 480);
     this->declare_parameter("voxel_leaf_size", 0.0);  // 0 = adaptive; 0.02-0.05 for vehicles
     this->declare_parameter("pointcloud_max_age_s", 0.5);  // 0 = disabled; reject stale cloud (depth dropout defense)
+    this->declare_parameter("sor_enabled", true);  // Statistical outlier removal (OpenNav pattern); reduces noisy 3D boxes
+    this->declare_parameter("sor_nb_neighbors", 5);
+    this->declare_parameter("sor_std_ratio", 2.0);
 
     this->get_parameter("input_segment_topic", input_segment_topic_);
     this->get_parameter("output_bbx3d_topic", output_bbx3d_topic_);
@@ -120,6 +131,9 @@ void SegmentationProcessor::initParams() {
     this->get_parameter("segment_image_height", segment_image_height_);
     this->get_parameter("voxel_leaf_size", voxel_leaf_size_);
     this->get_parameter("pointcloud_max_age_s", pointcloud_max_age_s_);
+    this->get_parameter("sor_enabled", sor_enabled_);
+    this->get_parameter("sor_nb_neighbors", sor_nb_neighbors_);
+    this->get_parameter("sor_std_ratio", sor_std_ratio_);
     last_tf_warn_time_ = rclcpp::Time(0);
     last_detection_publish_time_ = std::chrono::steady_clock::time_point{};
 
@@ -389,6 +403,20 @@ void SegmentationProcessor::calculate_boxes(const sensor_msgs::msg::PointCloud2&
         return;
     }
 
+    // Optional: Statistical outlier removal (OpenNav pattern) — reduces noisy 3D boxes from depth artifacts
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cluster_for_bbox(best_cluster);
+    if (sor_enabled_ && best_cluster->points.size() >= static_cast<size_t>(sor_nb_neighbors_ + 1)) {
+        pcl::PointCloud<pcl::PointXYZ>::Ptr sor_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
+        sor.setInputCloud(best_cluster);
+        sor.setMeanK(sor_nb_neighbors_);
+        sor.setStddevMulThresh(sor_std_ratio_);
+        sor.filter(*sor_cloud);
+        if (!sor_cloud->points.empty()) {
+            cluster_for_bbox = sor_cloud;
+        }
+    }
+
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::milli> duration = end - start;
     std::cout << " ****########****** Clustering processing  took " << duration.count()
@@ -399,7 +427,7 @@ void SegmentationProcessor::calculate_boxes(const sensor_msgs::msg::PointCloud2&
     maxx = maxy = maxz = -std::numeric_limits<float>::max();
     minx = miny = minz = std::numeric_limits<float>::max();
 
-    for (const auto& point : best_cluster->points) {
+    for (const auto& point : cluster_for_bbox->points) {
         if (std::isnan(point.x)) continue;
 
         maxx = std::max(point.x, maxx);
@@ -586,7 +614,10 @@ void SegmentationProcessor::push_center_marker(const pcl::PointXYZRGB& center){
 int main(int argc, char** argv) {
     rclcpp::init(argc, argv);
     auto node = std::make_shared<SegmentationProcessor>();
-    rclcpp::spin(node);
+    rclcpp::executors::MultiThreadedExecutor executor(
+        rclcpp::ExecutorOptions(), 2);  // 2 threads: segmentation + heartbeat/pointcloud
+    executor.add_node(node);
+    executor.spin();
     rclcpp::shutdown();
     return 0;
 }

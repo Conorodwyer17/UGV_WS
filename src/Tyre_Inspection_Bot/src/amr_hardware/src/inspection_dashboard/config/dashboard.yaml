@@ -1,0 +1,10 @@
+inspection_dashboard_node:
+  ros__parameters:
+    port: 8085
+    inspection_state_topic: "/inspection_state"
+    runtime_diagnostics_topic: "/inspection_manager/runtime_diagnostics"
+    mission_report_topic: "/inspection_manager/mission_report"
+    current_goal_topic: "/inspection_manager/current_goal"
+    start_mission_topic: "/inspection_manager/start_mission"
+    camera_topic: "/slamware_ros_sdk_server_node/left_image_raw"
+    enable_camera_stream: true

@@ -1,0 +1,31 @@
+# Example GitHub Actions pipeline for tyre-inspection stack
+# Place in .github/workflows/ci.yml
+
+name: CI
+
+on:
+  push:
+    branches: [main, feature/*]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-22.04
+    container:
+      image: ros:humble-ros-base-jammy
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deps
+        run: |
+          apt-get update && apt-get install -y python3-pip python3-colcon-common-extensions
+          pip3 install pytest
+      - name: Build
+        run: |
+          . /opt/ros/humble/setup.sh
+          cd src/Tyre_Inspection_Bot && colcon build --symlink-install
+      - name: Run tests
+        run: |
+          . install/setup.bash
+          colcon test --packages-select segmentation_3d
+          colcon test-result --all

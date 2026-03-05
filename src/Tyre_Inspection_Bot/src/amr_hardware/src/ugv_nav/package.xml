@@ -9,13 +9,17 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <depend>nav2_bringup</depend>
+  <exec_depend>nav2_bringup</exec_depend>
+  <exec_depend>gb_visual_detection_3d_msgs</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>nav2_msgs</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
   <exec_depend>rclpy</exec_depend>
   <exec_depend>std_msgs</exec_depend>
   <exec_depend>slamware_ros_sdk</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
+  <!-- Optional: for ekf_aurora.launch.py (sensor fusion); install: ros-humble-robot-localization -->
+  <exec_depend>robot_localization</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

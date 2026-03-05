@@ -18,7 +18,8 @@
     require_goal_transform: true
 
     # Topics (frozen)
-    detection_topic: /darknet_ros_3d/bounding_boxes
+    # Use merged topic (YOLO + PCL fallback) for robustness when YOLO misses tires
+    detection_topic: /tire_bounding_boxes_merged
     vehicle_boxes_topic: /aurora_semantic/vehicle_bounding_boxes  # Aurora 2.11 semantic vehicle detection; empty = use YOLO vehicles from detection_topic
     vehicle_detected_topic: /inspection_manager/vehicle_detected
     segmentation_mode_topic: /segmentation_mode
@@ -38,7 +39,7 @@
 
     # Detection (inspection_manager expects comma-separated string)
     vehicle_labels: "car,truck,bus"
-    tire_label: car-tire
+    tire_label: wheel   # best_fallback.pt class id=22; must match BEST_FALLBACK_MODEL_CLASSES.md
     min_vehicle_probability: 0.5
     min_tire_probability: 0.35
 
@@ -70,6 +71,7 @@
     max_state_repeats: 3
     nav_retry_budget: 3
     dispatch_fail_abort_count: 3
+    max_recoveries_before_skip: 3   # skip tire after this many Nav2 recoveries (still far from goal)
     rotation_search_enabled: true
     turn_in_place_enabled: true
     vehicle_patrol_interval_s: 10.0
@@ -85,6 +87,9 @@
     vehicle_max_distance_m: 20.0
     planned_tire_fallback_enabled: true
     planned_tire_box_extent_m: 0.25
+    refinement_ema_alpha: 0.3  # EMA smoothing for goal refinement; reduces flicker from detection jitter
+    # require_nav_permitted: gate goals on /stereo/navigation_permitted (depth gate). Set false if
+    # depth gate not used (e.g. headless test); aurora_bringup launches navigation_permitted_publisher when use_bridge=false.
     require_nav_permitted: true
     nav_permitted_topic: /stereo/navigation_permitted
     cmd_vel_topic: /cmd_vel
@@ -101,8 +106,8 @@
     vehicle_wheelbase_m: 2.7
     vehicle_track_m: 1.6
 
-    # Nav2 goal checker (from nav_aurora.yaml)
-    xy_goal_tolerance: 0.25
+    # Nav2 goal checker (aligned with nav_aurora.yaml; 0.15 for tire approach precision)
+    xy_goal_tolerance: 0.15
     yaw_goal_tolerance: 0.25
 
     # Mission logging (for headless runs; review after reconnect)

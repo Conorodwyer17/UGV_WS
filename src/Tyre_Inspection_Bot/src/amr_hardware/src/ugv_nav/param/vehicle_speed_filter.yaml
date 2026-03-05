@@ -1,0 +1,15 @@
+# Vehicle speed filter: dynamic OccupancyGrid from vehicle bounding boxes.
+# Slows robot when approaching detected vehicles (Nav2 SpeedFilter integration).
+
+vehicle_speed_filter_node:
+  ros__parameters:
+    vehicle_boxes_topic: "/aurora_semantic/vehicle_bounding_boxes"
+    filter_mask_topic: "/inspection/speed_filter_mask"
+    filter_info_topic: "/local_costmap/costmap_filter_info"
+    mask_frame_id: "map"
+    mask_resolution: 0.05
+    mask_width_m: 50.0
+    mask_height_m: 50.0
+    vehicle_buffer_m: 1.5
+    speed_percent_in_zone: 50
+    publish_rate_hz: 2.0

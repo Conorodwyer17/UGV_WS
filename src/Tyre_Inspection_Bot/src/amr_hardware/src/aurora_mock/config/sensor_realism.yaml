@@ -1,0 +1,31 @@
+# Aurora mock sensor realism config (Phase B + Phase 3)
+# Enable for stress-testing perception and state estimation.
+# Disabled by default for deterministic simulation runs.
+# Phase 3: synthetic_vehicle_depth uses improved vehicle model (box + 4 tires)
+# when vehicle_boxes_topic publishes; else falls back to center region.
+
+aurora_mock_node:
+  ros__parameters:
+    # Odom: Gaussian noise on pose/velocity; optional drift
+    enable_odom_noise: false
+    odom_position_noise_std: 0.015   # m (typical wheel odom)
+    odom_velocity_noise_std: 0.01    # m/s
+    odom_drift_rate: 0.0            # 0.001 = 0.1% per step
+
+    # Scan: range noise and dropout
+    enable_scan_noise: false
+    scan_range_noise_std: 0.01      # m
+    scan_dropout_prob: 0.0          # 0.01 = 1% of rays become inf
+
+    # Depth: Gaussian noise on valid depth values
+    enable_depth_noise: false
+    depth_noise_std: 0.01           # m
+
+    # Global: skip publishing this message (all topics except odom/TF)
+    message_dropout_prob: 0.0        # 0.02 = 2% of scan/image msgs dropped
+
+    # Latency (Phase 2): per-topic delay in ms; 0 = no delay
+    odom_latency_ms: 0.0
+    scan_latency_ms: 0.0
+    depth_latency_ms: 0.0
+    image_latency_ms: 0.0

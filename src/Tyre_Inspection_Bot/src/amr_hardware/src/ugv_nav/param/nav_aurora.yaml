@@ -75,7 +75,11 @@ bt_navigator_navigate_to_pose_rclcpp_node:
 controller_server:
   ros__parameters:
     use_sim_time: false
-    controller_frequency: 20.0
+    # Speed limit from vehicle_speed_filter_node (via SpeedFilter) when approaching vehicles
+    speed_limit_topic: "/speed_limit"
+    # 10 Hz when CPU contended (Jetson: YOLO+segmentation); 20 Hz if headroom (best_practices_matrix)
+    # Tuned 2025-03: 20->10 for Jetson stability; profiling showed segmentation_pr + python3 contention
+    controller_frequency: 10.0
     min_x_velocity_threshold: 0.001
     min_y_velocity_threshold: 0.5
     min_theta_velocity_threshold: 0.001
@@ -88,7 +92,7 @@ controller_server:
       movement_time_allowance: 15.0  # Allow slower real-world progress before recovery
     goal_checker:
       plugin: "nav2_controller::SimpleGoalChecker"
-      xy_goal_tolerance: 0.25
+      xy_goal_tolerance: 0.15  # Tighter for tire approach (was 0.25; unitree-go2 uses 0.1)
       yaw_goal_tolerance: 0.25
       stateful: True
     FollowPath:
@@ -121,8 +125,9 @@ controller_server:
       sim_time: 1.5
       linear_granularity: 0.05
       angular_granularity: 0.025
-      transform_tolerance: 0.2
-      xy_goal_tolerance: 0.25
+      # 1.0–2.0s for Aurora/mock TF timing; 2.0 allows controller to init when TF occasionally lags
+      transform_tolerance: 2.0
+      xy_goal_tolerance: 0.15  # DWB RotateToGoal; tighter for tire approach (was 0.25)
       trans_stopped_velocity: 0.25
       short_circuit_trajectory_evaluation: True
       stateful: True
@@ -150,14 +155,23 @@ local_costmap:
       rolling_window: true
       width: 5
       height: 5
+      # ROS Answers 416578: origin = width/2, height/2 for rolling window (sensor origin in bounds)
+      # If "sensor origin out of map bounds" appears: ensure global_frame matches observation sources
+      origin_x: 2.5
+      origin_y: 2.5
       resolution: 0.05
       # Waveshare UGV Rover 6-wheel base: 253 × 243 mm (L×W, from drawing); footprint in base_link
       footprint: "[ [0.127, 0.122], [0.127, -0.122], [-0.127, -0.122], [-0.127, 0.122] ]"
       plugins: ["obstacle_layer", "inflation_layer"]
+      filters: ["speed_filter"]
+      speed_filter:
+        plugin: "nav2_costmap_2d::SpeedFilter"
+        filter_info_topic: "costmap_filter_info"
+      # transform_tolerance: 0.5-1.0s for Aurora TF timing (research: nav2_system_tests)
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
-        inflation_radius: 0.55
+        inflation_radius: 0.6  # PATH_FORWARD: safety near vehicle; do not reduce below robot half-width
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: True
@@ -231,12 +245,13 @@ global_costmap:
           obstacle_min_range: 0.0
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
+        map_topic: /slamware_ros_sdk_server_node/map
         # Aurora SDK modified to publish map with TRANSIENT_LOCAL QoS for Nav2 compatibility
         map_subscribe_transient_local: True
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
-        inflation_radius: 0.3
+        inflation_radius: 0.35  # IEEE 10606581: allows gaps for inspection
       always_send_full_costmap: True
 
 map_saver:
@@ -286,7 +301,7 @@ behavior_server:
       plugin: "nav2_behaviors/AssistedTeleop"
     global_frame: odom  # From Aurora
     robot_base_frame: base_footprint
-    transform_tolerance: 0.1
+    transform_tolerance: 1.0  # Aurora TF timing; match costmaps (PATH_FORWARD, nav2_system_tests)
     use_sim_time: false
     simulate_ahead_time: 2.0
     max_rotational_vel: 0.5
@@ -301,11 +316,13 @@ waypoint_follower:
   ros__parameters:
     use_sim_time: false
     loop_rate: 20
+    # stop_on_failure: false = skip unreachable tyre, continue to next (research: nav2_waypoint_follower)
     stop_on_failure: false
     waypoint_task_executor_plugin: "wait_at_waypoint"
     wait_at_waypoint:
       plugin: "nav2_waypoint_follower::WaitAtWaypoint"
       enabled: True
+      # waypoint_pause_duration: ms to wait at each tyre before photo capture
       waypoint_pause_duration: 200
       
 recoveries_server:
@@ -320,7 +337,7 @@ recoveries_server:
       plugin: "nav2_recoveries/Wait"
     global_frame: odom  # From Aurora
     robot_base_frame: base_footprint
-    transform_timeout: 0.1
+    transform_timeout: 1.0  # Aurora TF timing; match costmaps (PATH_FORWARD, nav2_system_tests)
     use_sim_time: False
     simulate_ahead_time: 2.0
     max_rotational_vel: 0.6

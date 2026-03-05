@@ -1,0 +1,21 @@
+# Centroid servo: image-based fine positioning when distance_remaining < proximity_gate
+# Aurora left image: 416x224 (from slamware_ros_sdk_server_node/left_image_raw)
+
+centroid_servo_node:
+  ros__parameters:
+    objects_segment_topic: "/ultralytics_tire/segmentation/objects_segment"
+    runtime_diagnostics_topic: "/inspection_manager/runtime_diagnostics"
+    cmd_vel_topic: "/inspection/centroid_cmd_vel"
+    centroid_centered_topic: "/inspection_manager/centroid_centered"
+    proximity_gate_distance_m: 0.5
+    image_width: 416
+    image_height: 224
+    Kp_linear: 0.15
+    Kp_angular: 0.4
+    max_linear: 0.08
+    max_angular: 0.3
+    centroid_error_threshold: 0.03
+    control_rate_hz: 10.0
+    # Distance-based gain scaling: reduce gains when very close to avoid overshoot
+    distance_gain_scaling: true
+    min_distance_for_full_gain_m: 0.3

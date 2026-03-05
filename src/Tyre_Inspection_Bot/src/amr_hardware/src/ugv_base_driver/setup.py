@@ -19,6 +19,7 @@ setup(
     entry_points={
         'console_scripts': [
             'motor_driver_node = ugv_base_driver.motor_driver_node:main',
+            'stub_motor_node = ugv_base_driver.stub_motor_node:main',
         ],
     },
 )

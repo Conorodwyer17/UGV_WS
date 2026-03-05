@@ -1,2 +1,0 @@
-"""inspection_manager tests."""
-

@@ -4,6 +4,15 @@ from typing import List, Optional
 from gb_visual_detection_3d_msgs.msg import BoundingBox3d
 
 
+def _is_valid_box(box: BoundingBox3d) -> bool:
+    vals = [box.xmin, box.xmax, box.ymin, box.ymax, box.zmin, box.zmax, box.probability]
+    if not all(math.isfinite(v) for v in vals):
+        return False
+    if not (box.xmin < box.xmax and box.ymin < box.ymax and box.zmin < box.zmax):
+        return False
+    return True
+
+
 def parse_vehicle_labels(value) -> List[str]:
     if isinstance(value, str):
         labels = [label.strip() for label in value.split(",") if label.strip()]
@@ -47,6 +56,8 @@ def find_vehicle_box(
     filtered = []
     labels_lower = [label.lower() for label in vehicle_labels]
     for box in boxes:
+        if not _is_valid_box(box):
+            continue
         if box.object_name.lower() in labels_lower and box.probability >= min_prob:
             filtered.append(box)
 
@@ -113,7 +124,9 @@ def find_tire_for_inspection(
     """Find a tire that matches label and filters, favoring closest to robot."""
     filtered = [
         b for b in boxes
-        if b.object_name.lower() == tire_label.lower() and b.probability >= min_prob
+        if _is_valid_box(b)
+        and b.object_name.lower() == tire_label.lower()
+        and b.probability >= min_prob
     ]
 
     if not filtered:

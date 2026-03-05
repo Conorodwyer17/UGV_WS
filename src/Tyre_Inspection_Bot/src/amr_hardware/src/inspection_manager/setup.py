@@ -10,7 +10,7 @@ setup(
         ("share/ament_index/resource_index/packages", [f"resource/{package_name}"]),
         ("share/" + package_name, ["package.xml"]),
         ("share/" + package_name + "/launch", ["launch/inspection_manager.launch.py"]),
-        ("share/" + package_name + "/launch", ["launch/inspection_mission_launch.py"]),
+        ("share/" + package_name + "/launch", ["launch/inspection_full_mission.launch.py"]),
         ("share/" + package_name + "/config", ["config/trucks.yaml"]),
     ],
     install_requires=["setuptools", "pyyaml", "ament_index_python"],
@@ -23,8 +23,6 @@ setup(
         "console_scripts": [
             "inspection_manager_node = inspection_manager.inspection_manager_node:main",
             "photo_capture_service = inspection_manager.photo_capture_service:main",
-            "manager_node = inspection_manager.manager_node:main",
-            "photo_capture_api = inspection_manager.photo_capture_api:main",
             "visual_servo_align_server = inspection_manager.alignment:main",
         ],
     },

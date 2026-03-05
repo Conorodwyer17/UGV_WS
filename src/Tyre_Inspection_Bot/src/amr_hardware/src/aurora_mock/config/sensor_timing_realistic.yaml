@@ -1,0 +1,12 @@
+# Aurora mock timing realism (Phase 1)
+# Populate from: python scripts/analyze_aurora_bag.py /path/to/bag --output-yaml ...
+# Enable with enable_timing_realism:=true
+
+aurora_mock_node:
+  ros__parameters:
+    enable_timing_realism: false
+    # Jitter as fraction of nominal period (e.g. 0.05 = 5% variation)
+    odom_rate_jitter_std: 0.03
+    scan_rate_jitter_std: 0.05
+    image_rate_jitter_std: 0.05
+    map_rate_jitter_std: 0.05

@@ -30,12 +30,24 @@ RETRY_DELAY_S = 2.0
 TF_TARGET_FRAME = "odom"
 TF_SOURCE_FRAME = "base_link"
 TF_WAIT_TIMEOUT_S = 60.0
+# Time to wait for each Nav2 lifecycle service (get_state, change_state) to appear and respond
+SERVICE_WAIT_TIMEOUT_S = 60.0
+SERVICE_WAIT_LOG_INTERVAL_S = 5.0
 
 
 def _wait_for_service(node: Node, client, name: str, timeout_s: float) -> bool:
-    if client.wait_for_service(timeout_sec=timeout_s):
-        return True
-    node.get_logger().error(f"Service not available: {name}")
+    node.get_logger().info(f"Waiting for service {name} (timeout {timeout_s:.0f}s)...")
+    elapsed = 0.0
+    while elapsed < timeout_s:
+        if client.wait_for_service(timeout_sec=SERVICE_WAIT_LOG_INTERVAL_S):
+            node.get_logger().info(f"Service {name} available after {elapsed:.0f}s")
+            return True
+        elapsed += SERVICE_WAIT_LOG_INTERVAL_S
+        if elapsed < timeout_s:
+            node.get_logger().info(
+                f"Still waiting for {name}... ({elapsed:.0f}s / {timeout_s:.0f}s)"
+            )
+    node.get_logger().error(f"Service not available: {name} after {timeout_s:.0f}s")
     return False
 
 
@@ -113,10 +125,10 @@ def main() -> int:
         clients[name] = (get_state, change_state)
 
     for name, (get_state, change_state) in clients.items():
-        if not _wait_for_service(node, get_state, f"/{name}/get_state", 15.0):
+        if not _wait_for_service(node, get_state, f"/{name}/get_state", SERVICE_WAIT_TIMEOUT_S):
             rclpy.shutdown()
             return 1
-        if not _wait_for_service(node, change_state, f"/{name}/change_state", 15.0):
+        if not _wait_for_service(node, change_state, f"/{name}/change_state", SERVICE_WAIT_TIMEOUT_S):
             rclpy.shutdown()
             return 1
 
