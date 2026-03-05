@@ -1,0 +1,22 @@
+# Python dependencies for UGV Tyre Inspection Robot
+# Install with: pip3 install -r requirements.txt
+# For Jetson: use NVIDIA-provided PyTorch wheel; see SETUP.md
+
+# Core ML and vision
+ultralytics>=8.0.0
+opencv-python>=4.8.0
+numpy>=1.24.0
+Pillow>=9.5.0
+
+# PyTorch (install separately on Jetson - use NVIDIA wheel)
+# torch>=2.0.0
+
+# ONNX runtime (for CPU inference fallback; use onnxruntime-gpu on systems with CUDA)
+onnxruntime>=1.14.0
+
+# Config and ROS
+pyyaml>=6.0
+ros2-numpy>=0.0.3
+
+# ROS 2 bridge (install via apt: ros-humble-cv-bridge, or pip)
+# cv-bridge

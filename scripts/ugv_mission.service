@@ -1,7 +1,7 @@
-# UGV tire inspection mission — optional auto-start on boot (headless)
+# UGV tyre inspection mission — optional auto-start on boot (headless)
 # By default launch from terminal: ./scripts/startup.sh or ./scripts/mission_launch.sh
 #
-# Install (only if you want launch on boot):
+# For deployment: copy scripts/ugv_mission.service.example, edit User/Group/paths, then:
 #   sudo cp scripts/ugv_mission.service /etc/systemd/system/
 #   sudo systemctl daemon-reload
 #   sudo systemctl enable ugv_mission

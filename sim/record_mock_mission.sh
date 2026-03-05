@@ -51,4 +51,4 @@ ros2 bag record -o "${OUTPUT_DIR}" "${ALL_TOPICS[@]}"
 
 echo ""
 echo "Recording stopped. Bag saved to: ${OUTPUT_DIR}"
-echo "Compare to real: python3 scripts/compare_sim_to_real.py --sim-report ~/ugv_ws/logs/mission_report_latest.json --real-report /path/to/real_report.json"
+echo "Compare mission reports: diff ~/ugv_ws/logs/mission_report_latest.json /path/to/real_report.json"

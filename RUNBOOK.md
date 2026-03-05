@@ -5,6 +5,7 @@
 - **Building the workspace:** `cd ~/ugv_ws && colcon build --symlink-install && source install/setup.bash`. Place `best_fallback.pt` (or `best_fallback.engine`) in `src/Tyre_Inspection_Bot/` or workspace root. See [Clean build and cleanup](#clean-build-and-cleanup).
 - **Running a mission:** `./scripts/start_mission.sh` (recommended: disk check, Jetson performance, optional verification, then launch). Or `./scripts/startup.sh`; mission auto-starts when TF and Nav2 are ready. See [Option A: Start mission](#option-a-start-mission-recommended).
 - **Canonical launch:** `full_bringup.launch.py` (e.g. via `scripts/mission_launch.sh` or `scripts/startup.sh`). For real missions on the Jetson, use this launch — it starts the Aurora SDK, motor driver, Nav2, perception, and inspection manager. Do not use `inspection_full_mission.launch.py` alone (it does not start the Aurora SDK by default).
+- **Simulation (no hardware):** Use `ros2 launch sim vehicle_inspection_sim.launch.py use_mock:=true` for full simulation with synthetic Aurora. Note: `full_bringup.launch.py` does not fully support mock mode; it is intended for real hardware.
 - **Mission node:** **inspection_manager_node**. Flow: IDLE → SEARCH_VEHICLE → WAIT_VEHICLE_BOX → (first goal = **nearest corner**, then tyres 2–4 by distance). See [MISSION_PIPELINE.md](docs/MISSION_PIPELINE.md) for tyre order and scenario behaviour.
 - **First goal:** Always the **nearest** of the four tire corners (not “front left first” or clockwise). Flow: WAIT_VEHICLE_BOX → APPROACH_VEHICLE → WAIT_TIRE_BOX → INSPECT_TIRE / FACE_TIRE → VERIFY_CAPTURE (repeat tires, then NEXT_VEHICLE or DONE).
 - **Vehicle boxes:** Primary `/aurora_semantic/vehicle_bounding_boxes`. YOLO vehicle node is **disabled by default** (`use_vehicle_yolo:=false`) to save GPU/CPU; use `use_vehicle_yolo:=true` for YOLO fallback (feasible on 16 GB Jetson as redundant detection source).
@@ -143,7 +144,7 @@ Use this checklist when the new 16 GB Jetson arrives. See [SETUP.md](SETUP.md) f
 | 3 | Test Aurora connectivity | `ping -c 1 192.168.11.1` |
 | 4 | Run minimal bringup | `ros2 launch ugv_nav full_bringup.launch.py` — check `slamware_ros_sdk_server_node` logs "Connected to the selected device" |
 | 5 | Verify topics | `ros2 topic list` — expect slamware_*, aurora_semantic topics |
-| 6 | Run simulated mission | `ros2 launch ugv_nav full_bringup.launch.py use_mock:=true sim_tyre_detections:=true` — state machine should cycle |
+| 6 | Run simulated mission | `ros2 launch sim vehicle_inspection_sim.launch.py use_mock:=true` — state machine should cycle |
 | 7 | Live vehicle test | Place robot with car in view; run `./scripts/start_mission.sh` |
 
 **Before first live run:** Ensure `best_fallback.pt` is in `src/Tyre_Inspection_Bot/` and TensorRT engine is exported (`bash scripts/export_tensorrt.sh`). GPU inference is default on 16 GB.
@@ -325,7 +326,7 @@ With `use_mock:=true`, the mock publishes odom, scan, map, depth, images, and sy
 
 **Multi-vehicle:** `vehicle_count:=2` publishes two vehicles; mission completes 8 tires across both. **Stress-test:** `use_stress_test:=true` enables noise, latency, jitter, dropout, and occasional tire misses (PCL fallback). See sim/README.md.
 
-**Simulation launch variants:** `use_mock:=true`, `use_synthetic_vehicle:=true` (sensor realism), `use_stress_test:=true`, `vehicle_count:=N`. Record mock missions with `./sim/record_mock_mission.sh`; compare reports with `python3 scripts/compare_sim_to_real.py`.
+**Simulation launch variants:** `use_mock:=true`, `use_synthetic_vehicle:=true` (sensor realism), `use_stress_test:=true`, `vehicle_count:=N`. Record mock missions with `./sim/record_mock_mission.sh`.
 
 ---
 
@@ -508,13 +509,9 @@ To ensure simulation matches field behavior:
 
 1. **Record mock mission:** With `use_mock:=true` sim running, run `./sim/record_mock_mission.sh` in another terminal. Let the mission complete (or drive via teleop), then Ctrl+C. Bag saved to `sim/bags/mock_mission_YYYYMMDD_HHMMSS/`.
 
-2. **Compare mission reports:** After a sim run and a real run, compare outcomes:
-   ```bash
-   python3 scripts/compare_sim_to_real.py --sim-report ~/ugv_ws/logs/mission_report_latest.json --real-report /path/to/real_report.json
-   ```
-   Reports success, tires captured, errors, and duration. Use `--json` for machine-readable output.
+2. **Compare mission reports:** After a sim run and a real run, compare `mission_report_latest.json` files (success, tires captured, errors, duration) to validate sim vs real behaviour.
 
-3. **Acceptance:** Sim should achieve same outcome as real (4 tires captured, no errors) when vehicle geometry and environment match. Differences indicate sim gaps (e.g. costmap, depth, detection) to address.
+3. **Acceptance:** Sim should achieve same outcome as real (4 tyres captured, no errors) when vehicle geometry and environment match. Differences indicate sim gaps (e.g. costmap, depth, detection) to address.
 
 **Multi-vehicle testing:** `vehicle_count:=2` or `vehicle_count:=3` to test sequencing and return-later across vehicles. **Stress-test:** `use_stress_test:=true` to inject noise, latency, jitter, dropout, and tire misses; mission may still complete or fail in a controlled way.
 

@@ -221,7 +221,7 @@ def generate_launch_description():
     )
 
     # Wheel detection: canonical model best_fallback.pt (wheel class)
-    # Canonical path: ~/ugv_ws/src/Tyre_Inspection_Bot/best_fallback.pt (e.g. /home/conor/ugv_ws/src/Tyre_Inspection_Bot/best_fallback.pt)
+    # Canonical path: ~/ugv_ws/src/Tyre_Inspection_Bot/best_fallback.pt
     _bot_dir = os.path.expanduser("~/ugv_ws/src/Tyre_Inspection_Bot")
     wheel_model_path = os.path.join(_bot_dir, "best_fallback.pt")
     # Vehicle boxes from Aurora by default; enable use_vehicle_yolo for YOLO fallback only.

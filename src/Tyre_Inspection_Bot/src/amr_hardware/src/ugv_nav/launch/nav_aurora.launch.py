@@ -2,6 +2,7 @@
 # No SLAM, no AMCL - Aurora provides localization and map.
 
 import os
+import re
 import sys
 import tempfile
 
@@ -24,14 +25,14 @@ from launch.conditions import IfCondition, UnlessCondition
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node, SetRemap
 
-# Hardcoded path prefix to replace with package-relative path (from nav params YAML files)
-_BT_PATH_PREFIX = '/home/conor/ugv_ws/src/Tyre_Inspection_Bot/src/amr_hardware/src/ugv_nav/behavior_trees/'
+# Regex to match any absolute path ending with ugv_nav/behavior_trees/ (works for any workspace location)
+_BT_PATH_PATTERN = re.compile(r'/[^\s]+/ugv_nav/behavior_trees/')
 
 
 def _substitute_bt_paths(content: str, ugv_nav_dir: str) -> str:
-    """Replace hardcoded behavior tree paths with package-relative paths."""
+    """Replace hardcoded behaviour tree paths with package-relative paths."""
     bt_prefix = os.path.join(ugv_nav_dir, 'behavior_trees')
-    return content.replace(_BT_PATH_PREFIX, bt_prefix + '/')
+    return _BT_PATH_PATTERN.sub(bt_prefix + '/', content)
 
 
 def _create_nav_with_substituted_params(context):

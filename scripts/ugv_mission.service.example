@@ -1,0 +1,37 @@
+# Example systemd unit for UGV tyre inspection mission (auto-start on boot)
+# Copy to /etc/systemd/system/ and edit User, Group, and paths for your deployment:
+#   cp scripts/ugv_mission.service.example /etc/systemd/system/ugv_mission.service
+#   sudo sed -i 's/USER/your_username/g; s|/home/USER/ugv_ws|/home/your_username/ugv_ws|g' /etc/systemd/system/ugv_mission.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable ugv_mission
+#
+# Replace USER with your username and /home/USER/ugv_ws with your workspace path.
+
+[Unit]
+Description=UGV Tire Inspection Mission (Aurora 2.11)
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=USER
+Group=USER
+WorkingDirectory=/home/USER/ugv_ws
+
+Environment=LD_LIBRARY_PATH=/home/USER/ugv_ws/src/aurora_ros2_sdk_linux/src/aurora_remote_public/lib/linux_aarch64
+Environment=UGV_WS=/home/USER/ugv_ws
+Environment=SKIP_PREFLIGHT=1
+Environment=RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+Environment=HOME=/home/USER
+
+ExecStartPre=/bin/mkdir -p /home/USER/ugv_ws/logs
+ExecStart=/bin/bash -c 'source /opt/ros/humble/setup.bash && source /home/USER/ugv_ws/install/setup.bash && export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp SKIP_PREFLIGHT=1 && exec /home/USER/ugv_ws/scripts/mission_launch.sh'
+
+Restart=no
+RestartSec=10
+
+StandardOutput=append:/home/USER/ugv_ws/logs/mission_service.log
+StandardError=append:/home/USER/ugv_ws/logs/mission_service.log
+
+[Install]
+WantedBy=multi-user.target
