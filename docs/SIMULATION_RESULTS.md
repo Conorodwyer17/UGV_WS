@@ -78,7 +78,7 @@ Monitor: `ros2 topic echo /inspection_manager/runtime_diagnostics`.
 
 ---
 
-## 6. Simulation Pipeline Perfection (2025-03)
+## 6. Simulation Pipeline Perfection (2026-03)
 
 **Tire goal generation:** `vehicle_modeler.estimate_tire_positions_from_box` now uses box dimensions when they exceed default wheelbase/track (e.g. sim vehicle 4.5×2 m). Tire positions align with box corners.
 

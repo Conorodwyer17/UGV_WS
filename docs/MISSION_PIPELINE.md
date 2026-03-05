@@ -1,6 +1,6 @@
 # Mission Pipeline: Approach Vehicle → Tyre Inspection → Photo
 
-**Canonical flow for inspection_manager_node.** When you run the mission, this is exactly what happens.
+**Canonical flow for inspection_manager_node.** When you run the mission, this is exactly what happens. For a visual state-machine diagram, see [MISSION_FLOW.md](MISSION_FLOW.md).
 
 ---
 

@@ -19,7 +19,7 @@ segmentation_processor_node:
     segment_image_width: 640   # /slamware_ros_sdk_server_node/left_image_raw width
     segment_image_height: 480  # /slamware_ros_sdk_server_node/left_image_raw height
     # voxel_leaf_size: 0 = adaptive; 0.02-0.05 typical for vehicle-sized objects (best_practices_matrix)
-    # Tuned 2025-03: 0.02 overrides adaptive for faster clustering on Jetson
+    # Tuned 2026-03: 0.02 overrides adaptive for faster clustering on Jetson
     voxel_leaf_size: 0.02
     # Statistical outlier removal (OpenNav pattern); reduces noisy 3D boxes from depth artifacts
     sor_enabled: true

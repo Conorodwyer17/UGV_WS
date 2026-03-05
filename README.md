@@ -37,6 +37,7 @@ Note: `full_bringup.launch.py` does not fully support mock mode; it is intended 
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System architecture, node graph, TF tree, data flow |
 | [RUNBOOK.md](RUNBOOK.md) | Operations runbook, canonical stack, mission flow |
 | [docs/MISSION_PIPELINE.md](docs/MISSION_PIPELINE.md) | Mission flow: approach vehicle → tyre inspection → photo |
+| [docs/MISSION_FLOW.md](docs/MISSION_FLOW.md) | Mermaid state-machine diagram of the inspection mission |
 | [docs/ACCEPTANCE_CRITERIA.md](docs/ACCEPTANCE_CRITERIA.md) | Acceptance criteria for live mission |
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Consolidated troubleshooting guide |
 | [docs/TIRE_DETECTION_TROUBLESHOOTING.md](docs/TIRE_DETECTION_TROUBLESHOOTING.md) | Tyre detection pipeline, OOM workarounds, CPU inference |

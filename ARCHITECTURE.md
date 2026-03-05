@@ -101,4 +101,6 @@ All 3D bounding boxes (vehicles, tyres) are published in `slamware_map`. Navigat
 - **ugv_nav/param/** – Nav2 parameters (controller, costmap, recovery)
 - **segmentation_3d/config/** – YOLO and segmentation parameters
 
+**Mission flow:** See [docs/MISSION_FLOW.md](docs/MISSION_FLOW.md) for a Mermaid state-machine diagram of the inspection mission.
+
 See [RUNBOOK.md](RUNBOOK.md) for operational procedures and [SETUP.md](SETUP.md) for installation.

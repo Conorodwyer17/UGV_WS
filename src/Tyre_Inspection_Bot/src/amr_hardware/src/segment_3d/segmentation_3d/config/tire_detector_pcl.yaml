@@ -31,7 +31,7 @@ tire_detector_pcl_node:
     tire_max_extent_m: 0.55
 
     # Process rate (Hz); 2-5 Hz typical to limit CPU
-    # Tuned 2025-03: 3.0->2.0 for Jetson; reduces PCL processing load
+    # Tuned 2026-03: 3.0->2.0 for Jetson; reduces PCL processing load
     process_rate_hz: 2.0
 
 tire_merger_node:

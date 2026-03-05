@@ -1,4 +1,4 @@
-# Copyright 2024 UGV Tire Inspection
+# Copyright 2024-2026 UGV Tire Inspection
 # Launch SLAMTEC Aurora SDK node (slamware_ros_sdk) + aurora_sdk_bridge (depth pipeline).
 
 import os

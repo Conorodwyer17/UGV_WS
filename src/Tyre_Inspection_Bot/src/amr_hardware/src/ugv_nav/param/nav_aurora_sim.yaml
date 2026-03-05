@@ -80,7 +80,7 @@ controller_server:
     # Speed limit from vehicle_speed_filter_node (via SpeedFilter) when approaching vehicles
     speed_limit_topic: "/speed_limit"
     # 10 Hz when CPU contended (Jetson: YOLO+segmentation); 20 Hz if headroom (best_practices_matrix)
-    # Tuned 2025-03: 20->10 for Jetson stability; profiling showed segmentation_pr + python3 contention
+    # Tuned 2026-03: 20->10 for Jetson stability; profiling showed segmentation_pr + python3 contention
     controller_frequency: 5.0  # Reduced for sim CPU load
     min_x_velocity_threshold: 0.001
     min_y_velocity_threshold: 0.5
