@@ -1,20 +1,62 @@
-# ROS
+# Build and installation artifacts
 build/
 install/
 log/
-*.pyc
-__pycache__/
+logs/
 
-# Generated
+# Python cache
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.pytest_cache/
+
+# ROS 2 specific
+**/COLCON_IGNORE
+**/AMENT_IGNORE
+
+# IDE directories
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Personal/thesis files
+thesis/
+*.bak
+*.orig
+
+# Simulation bags
+sim/bags/
+*.bag
+*.bag.active
+
+# Local configuration (if any)
+*.local
+*.user
+
+# Model files: keep best_fallback.pt and .engine for production.
+# Do not ignore model files.
+
+# Any other temporary or large files
+*.log
+*.out
+*.err
+
+# Generated (from original)
 tire_inspection_photos/
 runs/
 vision_test_logs/
 indoor_test_logs/
-logs/
 backups/
 tmp/
 
 # Binaries and data
 *.deb
-*.pt
 datasets/
+
+# Generated directory listings
+folder_tree.txt
