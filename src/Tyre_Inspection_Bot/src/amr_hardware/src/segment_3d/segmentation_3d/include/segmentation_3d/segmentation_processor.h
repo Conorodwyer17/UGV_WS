@@ -41,6 +41,7 @@ public:
 private:
     void heartbeatTimerCallback();
     rclcpp::TimerBase::SharedPtr heartbeat_timer_;
+    rclcpp::CallbackGroup::SharedPtr segmentation_callback_group_;
     rclcpp::Subscription<segmentation_msgs::msg::ObjectsSegment>::SharedPtr segmentation_sub_;
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pointCloud_sub_;
     sensor_msgs::msg::PointCloud2::SharedPtr latest_pointcloud_;
@@ -70,6 +71,9 @@ private:
     int segment_image_height_;  // e.g. 480; segment indices are in this space, point cloud may be 416x224
     float voxel_leaf_size_;     // 0 = adaptive; 0.02-0.05 typical for vehicles (best_practices_matrix)
     double pointcloud_max_age_s_;  // 0 = disabled; reject cloud if stamp older than this (depth dropout defense)
+    bool sor_enabled_;  // Statistical outlier removal (OpenNav pattern)
+    int sor_nb_neighbors_;
+    double sor_std_ratio_;
     rclcpp::Time last_tf_warn_time_;
     std::chrono::steady_clock::time_point last_detection_publish_time_;  // Skip heartbeat when we recently published
     visualization_msgs::msg::MarkerArray center_markers_;

@@ -75,7 +75,25 @@ def generate_launch_description():
         ],
     )
 
-    # TF: map -> odom (Aurora provides odom relative to map). New-style args (no deprecation).
+    # TF: map -> slamware_map (identity). Ensures "map" frame exists when Nav2 is not running,
+    # so inspection_manager can transform detections to map.
+    map2slamware = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="map_to_slamware_map",
+        arguments=[
+            "--x", "0",
+            "--y", "0",
+            "--z", "0",
+            "--qx", "0",
+            "--qy", "0",
+            "--qz", "0",
+            "--qw", "1",
+            "--frame-id", "map",
+            "--child-frame-id", "slamware_map",
+        ],
+    )
+    # TF: slamware_map -> odom (Aurora provides odom relative to slamware_map).
     odom2map = Node(
         package="tf2_ros",
         executable="static_transform_publisher",
@@ -196,6 +214,7 @@ def generate_launch_description():
         use_bridge_arg,
         stereo_camera_info_arg,
         slamware_node,
+        map2slamware,
         odom2map,
         leftcam2base,
         rightcam2leftcam,

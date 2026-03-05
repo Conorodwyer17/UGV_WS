@@ -3,12 +3,12 @@
 # semantic_labels + depth_image_raw. Subscribes to those, publishes
 # /aurora_semantic/vehicle_bounding_boxes and /aurora_semantic/vehicle_markers (RViz).
 # If semantic_labels is not published (e.g. device not providing it), set fallback_vehicle_boxes_topic
-# to use YOLO 3D boxes (e.g. run segment_3d and pass /darknet_ros_3d/bounding_boxes).
+# to use YOLO 3D boxes (e.g. run segment_3d and pass /darknet_ros_3d/vehicle_bounding_boxes).
 #
 # Usage (Aurora already running):
 #   ros2 launch segmentation_3d vehicle_detection_visualize.launch.py
 # With YOLO fallback when semantic unavailable:
-#   ros2 launch segmentation_3d vehicle_detection_visualize.launch.py fallback_vehicle_boxes_topic:=/darknet_ros_3d/bounding_boxes
+#   ros2 launch segmentation_3d vehicle_detection_visualize.launch.py fallback_vehicle_boxes_topic:=/darknet_ros_3d/vehicle_bounding_boxes
 #
 # In RViz: Add display -> By topic -> /aurora_semantic/vehicle_markers (MarkerArray).
 # Frame: slamware_map.
@@ -31,7 +31,7 @@ def generate_launch_description():
     fallback_arg = DeclareLaunchArgument(
         'fallback_vehicle_boxes_topic',
         default_value='',
-        description='If semantic_labels not received after 10s, use vehicle boxes from this topic (e.g. /darknet_ros_3d/bounding_boxes). Empty to disable.',
+        description='If semantic_labels not received after 10s, use vehicle boxes from this topic. Empty = Aurora-only (default).',
     )
 
     aurora_semantic_fusion_node = Node(

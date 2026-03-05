@@ -1,3 +1,0 @@
-colcon build --symlink-install
-FAILED: ugv_description missing launch directory
-See analysis/build_output.txt for full logs.

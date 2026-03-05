@@ -18,7 +18,8 @@ bool filter_cloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_in,
 
 bool segment_cloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_in,
                    pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_segmented,
-                   const int number_of_planes);
+                   const int number_of_planes,
+                   float voxel_leaf_size = 0.0f);  // 0 = adaptive; 0.02-0.05 typical for vehicles
 
 bool cluster_cloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_in,
                    pcl::PointCloud<pcl::PointXYZ>::Ptr best_cluster,

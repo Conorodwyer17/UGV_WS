@@ -7,7 +7,8 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-find_package(nav2_bringup REQUIRED)
+# nav2_bringup is an exec_depend only; launch files use get_package_share_directory at runtime.
+# find_package(nav2_bringup) pulls workspace nav2 (research_repos) which requires nav2_ros_common/opennav.
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -25,11 +26,14 @@ install(
   DIRECTORY launch param maps rviz behavior_trees
   DESTINATION share/${PROJECT_NAME}
 )
+# Install scripts to lib/ugv_nav/. Launch expects executable name without .py.
 install(
   PROGRAMS
     scripts/nav_lifecycle_startup.py
     scripts/depth_gate_node.py
     scripts/navigation_permitted_publisher.py
+    scripts/vehicle_speed_filter_node.py
+    scripts/cmd_vel_mux_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

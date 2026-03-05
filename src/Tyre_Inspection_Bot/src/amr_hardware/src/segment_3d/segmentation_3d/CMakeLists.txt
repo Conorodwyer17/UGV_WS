@@ -60,6 +60,11 @@ install(PROGRAMS
   RENAME ultralytics_node
 )
 install(PROGRAMS
+  scripts/ultralytics_node_cpu.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME ultralytics_node_cpu
+)
+install(PROGRAMS
   scripts/aurora_camera_info_node.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME aurora_camera_info_node
@@ -83,6 +88,31 @@ install(PROGRAMS
   scripts/vehicle_boxes_marker_node.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME vehicle_boxes_marker_node
+)
+install(PROGRAMS
+  scripts/print_inspection_model_classes.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME print_inspection_model_classes
+)
+install(PROGRAMS
+  scripts/tire_detector_pcl_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME tire_detector_pcl_node
+)
+install(PROGRAMS
+  scripts/tire_merger_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME tire_merger_node
+)
+install(PROGRAMS
+  scripts/centroid_servo_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME centroid_servo_node
+)
+install(PROGRAMS
+  scripts/simulated_detection_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME simulated_detection_node
 )
 
 # Install header files

@@ -96,40 +96,67 @@ void findMinMax(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_segmented)
 // removal
 bool segment_cloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_in,
                    pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_segmented,
-                   const int number_of_planes)
+                   const int number_of_planes,
+                   float voxel_leaf_size_param)
 {
     if (!cloud_in || cloud_in->points.empty()) {
         std::cerr << "Input cloud is empty or null." << std::endl;
         return false;
     }
 
-    // Step 1: In-place filtering with a leaf size of 0.1 (adjusted if needed)
+    // Step 0: Passthrough filter - drop far/high points before VoxelGrid (speeds clustering)
+    // z > 2.0 m: above tire height; typical tire inspection: 0.3-2 m. Autoware-style preprocessing.
+    pcl::PointCloud<pcl::PointXYZ>::Ptr passthrough_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PassThrough<pcl::PointXYZ> pass;
+    pass.setInputCloud(cloud_in);
+    pass.setFilterFieldName("z");
+    pass.setFilterLimits(-5.0f, 2.0f);
+    pass.filter(*passthrough_cloud);
+    if (passthrough_cloud->points.empty()) {
+        *passthrough_cloud = *cloud_in;
+    }
+    const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_for_voxel = passthrough_cloud;
+
+    // Step 1: Voxel filter before clustering (Autoware-style: downsample before EuclideanClusterExtraction)
+    // Research: reduces point count significantly; 0.02-0.05m typical for vehicle-sized objects
     pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud(new pcl::PointCloud<pcl::PointXYZ>);
     
     // Calculate bounding box to determine appropriate leaf size
     pcl::PointXYZ min_pt, max_pt;
-    pcl::getMinMax3D(*cloud_in, min_pt, max_pt);
+    pcl::getMinMax3D(*cloud_for_voxel, min_pt, max_pt);
     float cloud_size_x = max_pt.x - min_pt.x;
     float cloud_size_y = max_pt.y - min_pt.y;
     float cloud_size_z = max_pt.z - min_pt.z;
+    float max_extent = std::max({cloud_size_x, cloud_size_y, cloud_size_z});
     
-    // Use adaptive leaf size based on cloud dimensions, but not too small
-    float leaf_size = std::max(0.01f, std::min({cloud_size_x, cloud_size_y, cloud_size_z}) / 100.0f);
-    leaf_size = std::min(leaf_size, 0.1f);  // Cap at 0.1m
+    // Configurable voxel_leaf_size > 0 overrides adaptive; 0 = use adaptive (best_practices_matrix)
+    float leaf_size;
+    if (voxel_leaf_size_param > 0.0f) {
+        leaf_size = voxel_leaf_size_param;
+    } else {
+        // Avoid PCL integer overflow: max ~80 voxels per axis (80^3 = 512k safe)
+        leaf_size = std::max(0.05f, max_extent / 80.0f);
+        leaf_size = std::min(leaf_size, 0.2f);
+        // Tuning: 0.02-0.05 typical for vehicle-sized objects (research: l2i, nav2_voxel_grid)
+        // For large clouds (>20k): use more aggressive leaf size to bring count down (speeds clustering)
+        size_t n = cloud_for_voxel->points.size();
+        if (n > 20000) {
+            leaf_size = std::max(leaf_size, 0.08f);  // Larger voxels = fewer points
+        }
+    }
     
     try {
         pcl::VoxelGrid<pcl::PointXYZ> voxel_grid;
-        voxel_grid.setInputCloud(cloud_in);
+        voxel_grid.setInputCloud(cloud_for_voxel);
         voxel_grid.setLeafSize(leaf_size, leaf_size, leaf_size);
         voxel_grid.filter(*filtered_cloud);
         
         if (filtered_cloud->points.empty()) {
-            std::cerr << "VoxelGrid filtering resulted in empty cloud. Using original cloud." << std::endl;
-            *filtered_cloud = *cloud_in;
+            *filtered_cloud = *cloud_for_voxel;
         }
     } catch (const pcl::PCLException& e) {
-        std::cerr << "VoxelGrid error: " << e.what() << ". Using original cloud without filtering." << std::endl;
-        *filtered_cloud = *cloud_in;
+        std::cerr << "VoxelGrid error: " << e.what() << ". Using passthrough cloud." << std::endl;
+        *filtered_cloud = *cloud_for_voxel;
     }
 
     // Step 2: Set up segmentation object

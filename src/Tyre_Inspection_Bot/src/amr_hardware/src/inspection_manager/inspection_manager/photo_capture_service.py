@@ -19,6 +19,7 @@ from rclpy.node import Node
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
 from std_msgs.msg import Bool, String
+from std_srvs.srv import Trigger
 
 
 class PhotoCaptureService(Node):
@@ -32,9 +33,13 @@ class PhotoCaptureService(Node):
         self.declare_parameter('save_directory', '~/ugv_ws/tire_inspection_photos')
         self.declare_parameter('image_format', 'jpg')
         self.declare_parameter('capture_metadata_topic', '/inspection_manager/capture_metadata')
+        self.declare_parameter('photo_capture_topic', '/inspection_manager/capture_photo')
+        self.declare_parameter('capture_result_topic', '/inspection_manager/capture_result')
         self.declare_parameter('metadata_max_age_s', 2.0)
         
         camera_topic = self.get_parameter('camera_topic').value
+        photo_capture_topic = self.get_parameter('photo_capture_topic').value
+        capture_result_topic = self.get_parameter('capture_result_topic').value
         save_dir = os.path.expanduser(self.get_parameter('save_directory').value)
         self.image_format = self.get_parameter('image_format').value
         self._metadata_max_age = self.get_parameter('metadata_max_age_s').value
@@ -68,10 +73,10 @@ class PhotoCaptureService(Node):
             10
         )
         
-        # Subscribe to capture trigger
+        # Subscribe to capture trigger (topic from params; must match inspection_manager photo_capture_topic)
         self.capture_sub = self.create_subscription(
             Bool,
-            '/inspection_manager/capture_photo',
+            photo_capture_topic,
             self.capture_callback,
             10
         )
@@ -84,11 +89,18 @@ class PhotoCaptureService(Node):
             10
         )
 
-        # Phase G: Publish capture result for validation
+        # Phase G: Publish capture result for validation (topic from params; inspection_manager subscribes to capture_result_topic)
         self.capture_result_pub = self.create_publisher(
-            String, '/inspection_manager/capture_result', 10
+            String, capture_result_topic, 10
         )
-        
+
+        # Manual trigger service for debugging: ros2 service call /photo_capture_service/capture_photo std_srvs/srv/Trigger
+        self.capture_srv = self.create_service(
+            Trigger,
+            "~/capture_photo",
+            self._capture_service_callback,
+        )
+
         self.get_logger().info("Photo capture service ready. Waiting for capture triggers...")
     
     def camera_callback(self, msg: Image):
@@ -127,7 +139,7 @@ class PhotoCaptureService(Node):
             if not file_exists:
                 writer.writerow([
                     'filename', 'frame_id', 'x', 'y', 'z', 'yaw', 'tire_class', 'tire_position',
-                    'vehicle_id', 'timestamp_sec', 'timestamp_nanosec'
+                    'tire_number', 'tire_goal_source', 'vehicle_id', 'timestamp_sec', 'timestamp_nanosec'
                 ])
             writer.writerow([
                 filename,
@@ -138,6 +150,8 @@ class PhotoCaptureService(Node):
                 meta.get('yaw', ''),
                 meta.get('tire_class', ''),
                 meta.get('tire_position', ''),
+                meta.get('tire_number', ''),
+                meta.get('tire_goal_source', ''),
                 meta.get('vehicle_id', ''),
                 meta.get('timestamp_sec', ''),
                 meta.get('timestamp_nanosec', ''),
@@ -152,24 +166,37 @@ class PhotoCaptureService(Node):
         msg.data = f"{result},{filename},{size_bytes}"
         self.capture_result_pub.publish(msg)
 
-    def capture_callback(self, msg: Bool):
-        """Handle photo capture trigger. Phase G: validate and publish result."""
-        if not msg.data:
-            return
-        
+    def _capture_service_callback(self, request, response):
+        """Manual trigger service for debugging: ros2 service call /photo_capture_service/capture_photo std_srvs/srv/Trigger"""
+        ok = self._do_capture()
+        response.success = ok
+        response.message = "Photo captured" if ok else "Capture failed (no image or write error)"
+        return response
+
+    def _do_capture(self) -> bool:
+        """Perform capture; returns True on success. Used by topic and service."""
         if not self.image_received or self.latest_image is None:
             self.get_logger().warn("Capture triggered but no camera image available yet")
             self._publish_capture_result(False, "", 0)
-            return
-        
+            return False
+
         try:
             # Convert ROS image to OpenCV
             cv_image = self.bridge.imgmsg_to_cv2(self.latest_image, "bgr8")
             
-            # Generate filename with timestamp
+            # Generate filename: tire_<vehicle_id>_<tire_num>_<timestamp> when metadata available
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
             self.photo_count += 1
-            filename = f"tire_{self.photo_count:03d}_{timestamp}.{self.image_format}"
+            meta = {}
+            now_s = self.get_clock().now().nanoseconds / 1e9
+            if self._latest_metadata and (now_s - self._latest_metadata_time) <= self._metadata_max_age:
+                try:
+                    meta = json.loads(self._latest_metadata)
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            vid = meta.get('vehicle_id', self.photo_count)
+            tnum = meta.get('tire_number', self.photo_count)
+            filename = f"tire_v{vid}_n{tnum}_{timestamp}.{self.image_format}"
             filepath = os.path.join(self.save_directory, filename)
             
             # Save image
@@ -177,8 +204,8 @@ class PhotoCaptureService(Node):
             if not ok:
                 self.get_logger().error("cv2.imwrite returned False")
                 self._publish_capture_result(False, filename, 0)
-                return
-            
+                return False
+
             # Phase G: validate file exists and non-zero
             size_bytes = 0
             if os.path.exists(filepath):
@@ -186,8 +213,8 @@ class PhotoCaptureService(Node):
             if size_bytes == 0:
                 self.get_logger().error(f"Saved file is zero bytes: {filepath}")
                 self._publish_capture_result(False, filename, 0)
-                return
-            
+                return False
+
             # Write per-image metadata (sidecar JSON + manifest CSV) when available
             self._write_metadata_for_capture(filepath, filename)
             
@@ -196,10 +223,18 @@ class PhotoCaptureService(Node):
                 f"(Resolution: {cv_image.shape[1]}x{cv_image.shape[0]}, {size_bytes} bytes)"
             )
             self._publish_capture_result(True, filename, size_bytes)
-            
+            return True
+
         except Exception as e:
             self.get_logger().error(f"Error capturing photo: {e}")
             self._publish_capture_result(False, "", 0)
+            return False
+
+    def capture_callback(self, msg: Bool):
+        """Handle photo capture trigger from topic. Phase G: validate and publish result."""
+        if not msg.data:
+            return
+        self._do_capture()
 
 
 def main(args=None):

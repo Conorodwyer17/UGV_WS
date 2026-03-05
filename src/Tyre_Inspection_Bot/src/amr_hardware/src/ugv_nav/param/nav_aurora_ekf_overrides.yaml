@@ -1,0 +1,11 @@
+# Override odom_topic to use EKF output when robot_localization ekf_node is running.
+# Load this after nav_aurora.yaml (e.g. params_file: [nav_aurora.yaml, nav_aurora_ekf_overrides.yaml])
+# so that Nav2 and velocity_smoother use /odometry/filtered instead of raw Aurora odom.
+
+bt_navigator:
+  ros__parameters:
+    odom_topic: /odometry/filtered
+
+velocity_smoother:
+  ros__parameters:
+    odom_topic: "/odometry/filtered"
