@@ -1,4 +1,4 @@
-# Mission Pipeline: Approach Vehicle → Tire Inspection → Photo
+# Mission Pipeline: Approach Vehicle → Tyre Inspection → Photo
 
 **Canonical flow for inspection_manager_node.** When you run the mission, this is exactly what happens.
 
@@ -7,9 +7,9 @@
 ## Overview
 
 1. **Phase 1 — Approach vehicle:** Detect car at distance (vehicle bounding box), navigate to approach pose (offset in front of vehicle).
-2. **Phase 2 — Tire inspection:** When close, switch to tire inspection (best_fallback.pt / wheel class). Derive tire positions from vehicle box (FL, FR, RL, RR). Navigate to each tire, face it, take photo when wheel detected.
+2. **Phase 2 — Tyre inspection:** When close, switch to tyre inspection (best_fallback.pt / wheel class). Derive tyre positions from vehicle box (FL, FR, RL, RR). Navigate to each tyre, face it, take photo when wheel detected.
 
-**Key invariant:** Do *not* look for tires at distance—they are too small. Approach the vehicle first, then use wheel detection or planned fallback.
+**Key invariant:** Do *not* look for tyres at distance—they are too small. Approach the vehicle first, then use wheel detection or planned fallback.
 
 ---
 
@@ -30,29 +30,29 @@
 | 1c | **aurora_semantic_fusion** | `/aurora_semantic/vehicle_bounding_boxes` | Aurora semantic (primary when configured) |
 | 1d | **inspection_manager** | Subscribes to vehicle_boxes_topic or vehicle_detection_topic | vehicle_boxes_topic = Aurora primary |
 
-**Result:** Vehicle box in slamware_map. With `approach_nearest_corner: true`, first goal = **nearest tire corner** (distance-sorted). Otherwise goal = nearest point on box + approach_offset (never through vehicle). See [MISSION_TIRE_ORDER_AND_SCENARIO.md](MISSION_TIRE_ORDER_AND_SCENARIO.md).
+**Result:** Vehicle box in slamware_map. With `approach_nearest_corner: true`, first goal = **nearest tyre corner** (distance-sorted). Otherwise goal = nearest point on box + approach_offset (never through vehicle).
 
 ---
 
-## Phase 2: Tire Inspection (When Close)
+## Phase 2: Tyre Inspection (When Close)
 
 | State | Action |
 |-------|--------|
-| **WAIT_TIRE_BOX** | Switch to inspection mode (best_fallback.pt / wheel). Wait for tire box on `/darknet_ros_3d/tire_bounding_boxes` OR use planned fallback (4 tires from vehicle box: FL, FR, RL, RR). |
-| **INSPECT_TIRE** | Navigate to tire (detected or planned). On success → FACE_TIRE. |
-| **FACE_TIRE** | Rotate in place to face tire before capture. On success → VERIFY_CAPTURE. |
-| **VERIFY_CAPTURE** | Publish to `/inspection_manager/capture_photo`; wait for result on `/inspection_manager/capture_result`. When wheel detected → capture. On success → WAIT_TIRE_BOX (next tire). |
+| **WAIT_TIRE_BOX** | Switch to inspection mode (best_fallback.pt / wheel). Wait for tyre box on `/darknet_ros_3d/tire_bounding_boxes` OR use planned fallback (4 tyres from vehicle box: FL, FR, RL, RR). |
+| **INSPECT_TIRE** | Navigate to tyre (detected or planned). On success → FACE_TIRE. |
+| **FACE_TIRE** | Rotate in place to face tyre before capture. On success → VERIFY_CAPTURE. |
+| **VERIFY_CAPTURE** | Publish to `/inspection_manager/capture_photo`; wait for result on `/inspection_manager/capture_result`. When wheel detected → capture. On success → WAIT_TIRE_BOX (next tyre). |
 
-### Tire Detection (Close Range)
+### Tyre Detection (Close Range)
 
 | Step | Component | Topic | Notes |
 |------|-----------|-------|-------|
 | 2a | **ultralytics_tire** | best_fallback.pt (wheel class) | fixed_mode: inspection |
 | 2b | **segmentation_processor_tire** | `/darknet_ros_3d/tire_bounding_boxes` | 3D boxes from YOLO + depth |
 | 2c | **inspection_manager** | Subscribes | detection_topic (tire_bounding_boxes) |
-| 2d | **Planned fallback** | When no wheels detected within timeout | 4 tires at vehicle geometry via `estimate_tire_positions(vehicle_center, robot_pos)` (FL, FR, RL, RR) |
+| 2d | **Planned fallback** | When no wheels detected within timeout | 4 tyres at vehicle geometry via `estimate_tire_positions(vehicle_center, robot_pos)` (FL, FR, RL, RR) |
 
-**Result:** Tire position from wheel detection or planned fallback. `_dispatch_box_goal(tire_box, offset=tire_offset)` computes tire approach pose. Photo when wheel detected at VERIFY_CAPTURE.
+**Result:** Tyre position from wheel detection or planned fallback. `_dispatch_box_goal(tire_box, offset=tire_offset)` computes tyre approach pose. Photo when wheel detected at VERIFY_CAPTURE.
 
 ---
 
@@ -104,7 +104,7 @@ Published to `/segmentation_mode`. segment_3d dual-stream runs both vehicle and 
 3. **Vehicle visible** — At least one vehicle on `/aurora_semantic/vehicle_bounding_boxes` or `/darknet_ros_3d/vehicle_bounding_boxes`.
 4. **Camera** — `/slamware_ros_sdk_server_node/left_image_raw` publishing.
 5. **Nav2** — `/navigate_to_pose` action server available.
-6. **Offsets** — `approach_offset` 0.7 m, `tire_offset` 0.5 m (see [NAVIGATION_SAFETY.md](NAVIGATION_SAFETY.md)).
+6. **Offsets** — `approach_offset` 0.7 m, `tire_offset` 0.5 m.
 
 ---
 
@@ -125,9 +125,9 @@ ros2 topic pub --once /inspection_manager/start_mission std_msgs/msg/Bool "{data
 1. **Car detection (distance)** — Aurora semantic or YOLO → vehicle bounding box in slamware_map.
 2. **Approach vehicle** — Goal = vehicle_center − offset × dir(robot→vehicle). Nav2 drives there.
 3. **Switch to tire inspection** — When close (WAIT_TIRE_BOX), use best_fallback.pt for wheel detection.
-4. **Tire positions** — From wheel detection or planned fallback (4 tires: FL, FR, RL, RR from vehicle box).
-5. **Navigate to tire** — For each tire: approach pose (tire − offset × dir), Nav2 drives.
-6. **Face tire** — Rotate to face tire before capture.
+4. **Tyre positions** — From wheel detection or planned fallback (4 tyres: FL, FR, RL, RR from vehicle box).
+5. **Navigate to tyre** — For each tyre: approach pose (tyre − offset × dir), Nav2 drives.
+6. **Face tyre** — Rotate to face tyre before capture.
 7. **Take photo** — Publish to `/inspection_manager/capture_photo`; **photo_capture_service** saves PNG and publishes SUCCESS/FAILURE to `/inspection_manager/capture_result`. VERIFY_CAPTURE fails if photo_capture_service is not running.
-8. **Next tire** — Return to WAIT_TIRE_BOX until all 4 tires done.
+8. **Next tyre** — Return to WAIT_TIRE_BOX until all 4 tyres done.
 9. **Complete** — NEXT_VEHICLE or DONE.

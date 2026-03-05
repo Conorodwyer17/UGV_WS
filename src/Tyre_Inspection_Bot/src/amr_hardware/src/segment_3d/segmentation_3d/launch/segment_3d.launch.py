@@ -15,7 +15,7 @@ import os
 
 def _create_tire_nodes(context, wheel_model_path):
     """Create ultralytics_tire_node (GPU) or ultralytics_tire_cpu (CPU) based on use_cpu_inference."""
-    use_cpu = perform_substitutions(context, [LaunchConfiguration('use_cpu_inference', default='true')])
+    use_cpu = perform_substitutions(context, [LaunchConfiguration('use_cpu_inference', default='false')])
     use_cpu = str(use_cpu).strip().lower() in ('true', '1', 'yes')
 
     if use_cpu:
@@ -64,11 +64,11 @@ def _create_tire_nodes(context, wheel_model_path):
                 'subscribe_mode_topic': False,
                 'objects_segment_topic': '/ultralytics_tire/segmentation/objects_segment',
                 'segmentation_image_topic': '/ultralytics_tire/segmentation/image',
-                'inference_interval_s': 1.5,
+                'inference_interval_s': LaunchConfiguration('inference_interval_s', default='0.1'),
                 'interested_class_names': ['wheel'],
                 'max_det': LaunchConfiguration('wheel_max_det', default='100'),
                 'imgsz': LaunchConfiguration('wheel_imgsz', default='640'),
-                'model_load_delay_s': LaunchConfiguration('model_load_delay_s', default='5.0'),
+                'model_load_delay_s': LaunchConfiguration('model_load_delay_s', default='1.0'),
             }],
             condition=IfCondition(LaunchConfiguration('use_yolo', default='true')),
         )
@@ -186,13 +186,18 @@ def generate_launch_description():
     )
     use_cpu_inference_arg = DeclareLaunchArgument(
         'use_cpu_inference',
-        default_value='true',
-        description='Use CPU-based ONNX tire detection (no GPU). Set false for GPU TensorRT/PyTorch. Default true avoids CUDA OOM.',
+        default_value='false',
+        description='Use CPU ONNX tire detection. Set true for fallback. Default false = GPU (16 GB Jetson).',
+    )
+    inference_interval_s_arg = DeclareLaunchArgument(
+        'inference_interval_s',
+        default_value='0.1',
+        description='Seconds between GPU tire inferences. 0.1 = 10 Hz for 16 GB Jetson; increase if model cannot keep up.',
     )
     model_load_delay_arg = DeclareLaunchArgument(
         'model_load_delay_s',
-        default_value='5.0',
-        description='Seconds to delay before loading YOLO/TensorRT model; lets other nodes settle to reduce CUDA OOM on Jetson. Set 10.0 if OOM persists.',
+        default_value='1.0',
+        description='Seconds to delay before loading YOLO/TensorRT model. 1.0 for 16 GB Jetson; increase if OOM persists.',
     )
 
     # Semantic fusion for vehicle detection (Aurora 2.11) — same intrinsics as depth pipeline.
@@ -434,6 +439,7 @@ def generate_launch_description():
         prefer_tensorrt_inspection_arg,
         use_vehicle_yolo_arg,
         use_cpu_inference_arg,
+        inference_interval_s_arg,
         model_load_delay_arg,
         aurora_semantic_fusion_node,
         vehicle_boxes_marker_node,

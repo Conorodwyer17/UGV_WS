@@ -1,6 +1,6 @@
 # Repository Cleanup Plan — Essential Files Only
 
-**Date:** 2026-03-04  
+**Date:** 2026-03-04
 **Goal:** Reduce the repository to essential files for build, run, and maintenance. End with exactly three startup scripts plus essential utilities.
 
 ---

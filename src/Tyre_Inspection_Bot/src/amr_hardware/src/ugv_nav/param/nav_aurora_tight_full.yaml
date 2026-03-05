@@ -72,7 +72,7 @@ bt_navigator_navigate_through_poses_rclcpp_node:
 bt_navigator_navigate_to_pose_rclcpp_node:
   ros__parameters:
     use_sim_time: false
-    
+
 controller_server:
   ros__parameters:
     use_sim_time: false
@@ -208,8 +208,8 @@ local_costmap:
 global_costmap:
   global_costmap:
     ros__parameters:
-      update_frequency: 1.0
-      publish_frequency: 1.0
+      update_frequency: 2.0
+      publish_frequency: 2.0
       global_frame: map  # From Aurora
       robot_base_frame: base_link
       use_sim_time: False
@@ -274,7 +274,7 @@ planner_server:
       tolerance: 0.5
       use_astar: false
       allow_unknown: true
-    use_final_approach_orientation: True 
+    use_final_approach_orientation: True
 
 smoother_server:
   ros__parameters:
@@ -285,7 +285,7 @@ smoother_server:
       tolerance: 1.0e-10
       max_its: 1000
       do_refinement: True
- 
+
 behavior_server:
   ros__parameters:
     costmap_topic: local_costmap/costmap_raw
@@ -325,7 +325,7 @@ waypoint_follower:
       enabled: True
       # waypoint_pause_duration: ms to wait at each tyre before photo capture
       waypoint_pause_duration: 200
-      
+
 recoveries_server:
   ros__parameters:
     costmap_topic: local_costmap/costmap_raw
@@ -344,7 +344,7 @@ recoveries_server:
     max_rotational_vel: 0.6
     min_rotational_vel: 0.05
     rotational_acc_lim: 3.2
-    
+
 velocity_smoother:
   ros__parameters:
     use_sim_time: false

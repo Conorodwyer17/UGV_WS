@@ -1,7 +1,8 @@
 #!/bin/bash
-# Export best_fallback.pt to TensorRT engine for Jetson Orin (PATH_FORWARD §3.6).
+# Export best_fallback.pt to TensorRT engine for Jetson Orin (16 GB recommended).
 # Run on the Jetson: cd ~/ugv_ws && bash scripts/export_tensorrt.sh
 # The ultralytics_node will use best_fallback.engine when prefer_tensorrt_inspection=true.
+# Default: imgsz=640, workspace=8 GB for 16 GB Jetson Orin Nano.
 
 set -e
 UGV_WS="${UGV_WS:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
@@ -28,10 +29,10 @@ echo "Exporting $MODEL_PT to TensorRT engine..."
 echo "Output: $OUTPUT_ENGINE"
 echo ""
 
-# Optional: IMGSZ=320 WORKSPACE=1 for OOM mitigation on Jetson (smaller engine, less memory at load)
+# 16 GB Jetson: 8 GB workspace; override with IMGSZ=320 WORKSPACE=4 for OOM on 8 GB
 IMGSZ="${IMGSZ:-640}"
-WORKSPACE="${WORKSPACE:-4}"
-echo "Using imgsz=$IMGSZ workspace=${WORKSPACE}GB (override with env: IMGSZ=320 WORKSPACE=1 for OOM)"
+WORKSPACE="${WORKSPACE:-8}"
+echo "Using imgsz=$IMGSZ workspace=${WORKSPACE}GB (override with env: IMGSZ=320 WORKSPACE=4 for OOM)"
 echo ""
 
 # Requires: pip install ultralytics

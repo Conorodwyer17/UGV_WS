@@ -1,6 +1,7 @@
-# Phase K: Production Config — Aurora 2.11 Native
+# Phase K: Production Config — Aurora 2.11 Native (16 GB Jetson Orin Nano)
 # use_bridge=false: Aurora native depth (224x416) + semantic segmentation
 # depth_to_registered_pointcloud uses aurora_depth_camera_info (416x224)
+# Tyre detection: GPU default (use_cpu_inference:=false), wheel_imgsz:=640, 10 Hz. See full_bringup launch args.
 # ROS 2 params format: apply to all nodes that load this file (inspection_manager, photo_capture_service).
 # Full-system-on-launch: mission auto-starts when Nav2 is ready; dry_run false for real motion and photos.
 
@@ -18,7 +19,7 @@
     require_goal_transform: true
 
     # Topics (frozen)
-    # Use merged topic (YOLO + PCL fallback) for robustness when YOLO misses tires
+    # Use merged topic (YOLO + PCL fallback) for robustness when YOLO misses tyres
     detection_topic: /tire_bounding_boxes_merged
     vehicle_boxes_topic: /aurora_semantic/vehicle_bounding_boxes  # Aurora 2.11 semantic vehicle detection; empty = use YOLO vehicles from detection_topic
     vehicle_detected_topic: /inspection_manager/vehicle_detected
@@ -71,7 +72,7 @@
     max_state_repeats: 3
     nav_retry_budget: 3
     dispatch_fail_abort_count: 3
-    max_recoveries_before_skip: 3   # skip tire after this many Nav2 recoveries (still far from goal)
+    max_recoveries_before_skip: 3   # skip tyre after this many Nav2 recoveries (still far from goal)
     rotation_search_enabled: true
     turn_in_place_enabled: true
     vehicle_patrol_interval_s: 10.0
@@ -101,12 +102,12 @@
     spin_detect_distance_m: 0.1
     spin_detect_min_time_s: 3.0
 
-    # Tire coverage
+    # Tyre coverage
     expected_tires_per_vehicle: 4
     vehicle_wheelbase_m: 2.7
     vehicle_track_m: 1.6
 
-    # Nav2 goal checker (aligned with nav_aurora.yaml; 0.15 for tire approach precision)
+    # Nav2 goal checker (aligned with nav_aurora.yaml; 0.15 for tyre approach precision)
     xy_goal_tolerance: 0.15
     yaw_goal_tolerance: 0.25
 

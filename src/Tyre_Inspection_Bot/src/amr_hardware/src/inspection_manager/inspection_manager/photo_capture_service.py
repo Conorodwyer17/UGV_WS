@@ -219,7 +219,7 @@ class PhotoCaptureService(Node):
             self._write_metadata_for_capture(filepath, filename)
             
             self.get_logger().info(
-                f"✓ Photo captured: {filename} "
+                f"Photo captured: {filename} "
                 f"(Resolution: {cv_image.shape[1]}x{cv_image.shape[0]}, {size_bytes} bytes)"
             )
             self._publish_capture_result(True, filename, size_bytes)

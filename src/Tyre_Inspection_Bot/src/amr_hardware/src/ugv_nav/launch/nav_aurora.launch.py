@@ -3,6 +3,7 @@
 
 import os
 import sys
+import tempfile
 
 from ament_index_python.packages import (
     get_package_prefix,
@@ -14,48 +15,71 @@ from launch.actions import (
     ExecuteProcess,
     GroupAction,
     IncludeLaunchDescription,
+    OpaqueFunction,
     SetEnvironmentVariable,
     TimerAction,
 )
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.conditions import IfCondition, UnlessCondition
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node, SetRemap
 
+# Hardcoded path prefix to replace with package-relative path (from nav params YAML files)
+_BT_PATH_PREFIX = '/home/conor/ugv_ws/src/Tyre_Inspection_Bot/src/amr_hardware/src/ugv_nav/behavior_trees/'
 
-def generate_launch_description():
-    # Force Fast DDS to use UDP only (avoids SHM port conflicts when multiple ROS processes run).
-    # For more reliable Nav2 lifecycle bringup, use Cyclone in *all* terminals:
-    #   export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp  (install: ros-humble-rmw-cyclonedds-cpp)
-    set_fastdds_udp = SetEnvironmentVariable(name='FASTDDS_BUILTIN_TRANSPORTS', value='UDPv4')
+
+def _substitute_bt_paths(content: str, ugv_nav_dir: str) -> str:
+    """Replace hardcoded behavior tree paths with package-relative paths."""
+    bt_prefix = os.path.join(ugv_nav_dir, 'behavior_trees')
+    return content.replace(_BT_PATH_PREFIX, bt_prefix + '/')
+
+
+def _create_nav_with_substituted_params(context):
+    """Create temp param files with substituted BT paths and return nav TimerActions."""
+    ugv_nav_dir = get_package_share_directory('ugv_nav')
+    param_dir = os.path.join(ugv_nav_dir, 'param')
+    param_basenames = [
+        'nav_aurora.yaml',
+        'nav_aurora_ekf.yaml',
+        'nav_aurora_tight_full.yaml',
+        'nav_aurora_tight_ekf.yaml',
+        'nav_aurora_sim.yaml',
+    ]
+    temp_files = {}
+    for basename in param_basenames:
+        src_path = os.path.join(param_dir, basename)
+        with open(src_path, 'r') as f:
+            content = f.read()
+        substituted = _substitute_bt_paths(content, ugv_nav_dir)
+        fd, tmp_path = tempfile.mkstemp(suffix='.yaml', prefix='nav_aurora_')
+        os.close(fd)
+        with open(tmp_path, 'w') as f:
+            f.write(substituted)
+        temp_files[basename] = tmp_path
+
+    sim_tyre = context.perform_substitution(
+        LaunchConfiguration('sim_tyre_detections', default='false')
+    )
+    use_tight = context.perform_substitution(
+        LaunchConfiguration('use_tight_goal_tolerance', default='false')
+    )
+    use_ekf = context.perform_substitution(
+        LaunchConfiguration('use_ekf', default='false')
+    )
+
+    if sim_tyre == 'true':
+        params_file = temp_files['nav_aurora_sim.yaml']
+    elif use_tight == 'true' and use_ekf == 'true':
+        params_file = temp_files['nav_aurora_tight_ekf.yaml']
+    elif use_tight == 'true':
+        params_file = temp_files['nav_aurora_tight_full.yaml']
+    elif use_ekf == 'true':
+        params_file = temp_files['nav_aurora_ekf.yaml']
+    else:
+        params_file = temp_files['nav_aurora.yaml']
 
     bringup_dir = get_package_share_directory('nav2_bringup')
-    ugv_nav_dir = get_package_share_directory('ugv_nav')
     launch_dir = os.path.join(bringup_dir, 'launch')
-
-    # use_tight_goal_tolerance: xy 0.1 m, max_vel 0.18; use_ekf: odom_topic /odometry/filtered
-    # sim_tyre_detections: rolling global costmap, lower frequencies
-    from launch.substitutions import PythonExpression
-    params_default = os.path.join(ugv_nav_dir, 'param', 'nav_aurora.yaml')
-    params_tight = os.path.join(ugv_nav_dir, 'param', 'nav_aurora_tight_full.yaml')
-    params_ekf = os.path.join(ugv_nav_dir, 'param', 'nav_aurora_ekf.yaml')
-    params_tight_ekf = os.path.join(ugv_nav_dir, 'param', 'nav_aurora_tight_ekf.yaml')
-    params_sim = os.path.join(ugv_nav_dir, 'param', 'nav_aurora_sim.yaml')
-    params_file = PythonExpression([
-        "'", params_sim, "' if '",
-        LaunchConfiguration('sim_tyre_detections', default='false'),
-        "' == 'true' else '", params_tight_ekf, "' if '",
-        LaunchConfiguration('use_tight_goal_tolerance', default='false'),
-        "' == 'true' and '", LaunchConfiguration('use_ekf', default='false'),
-        "' == 'true' else '", params_tight, "' if '",
-        LaunchConfiguration('use_tight_goal_tolerance', default='false'),
-        "' == 'true' else '", params_ekf, "' if '",
-        LaunchConfiguration('use_ekf', default='false'),
-        "' == 'true' else '", params_default, "'"
-    ])
-
-    # So Nav2 global costmap gets Aurora's map (Aurora publishes to slamware_map)
-    # Remap Nav2 cmd_vel -> cmd_vel_nav_source; cmd_vel_mux selects nav vs centroid_servo -> cmd_vel_nav
     nav_group = GroupAction(
         actions=[
             SetRemap(src='/map', dst='/slamware_ros_sdk_server_node/map'),
@@ -67,18 +91,35 @@ def generate_launch_description():
                 launch_arguments={
                     'namespace': '',
                     'use_sim_time': LaunchConfiguration('use_sim_time', default='false'),
-                    # Manual lifecycle script; composition needs a container we don't provide
                     'autostart': 'false',
                     'params_file': params_file,
                     'use_composition': 'False',
                     'use_respawn': 'False',
                     'container_name': 'nav2_container',
-                    # Debug controller_server lifecycle stall (e.g. waiting for TF/map)
                     'log_level': LaunchConfiguration('nav2_log_level', default='info'),
                 }.items(),
             ),
         ]
     )
+    return [
+        TimerAction(
+            period=5.0,
+            actions=[nav_group],
+            condition=IfCondition(LaunchConfiguration('external_tf', default='false')),
+        ),
+        TimerAction(
+            period=15.0,
+            actions=[nav_group],
+            condition=UnlessCondition(LaunchConfiguration('external_tf', default='false')),
+        ),
+    ]
+
+
+def generate_launch_description():
+    # Force Fast DDS to use UDP only (avoids SHM port conflicts when multiple ROS processes run).
+    # For more reliable Nav2 lifecycle bringup, use Cyclone in *all* terminals:
+    #   export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp  (install: ros-humble-rmw-cyclonedds-cpp)
+    set_fastdds_udp = SetEnvironmentVariable(name='FASTDDS_BUILTIN_TRANSPORTS', value='UDPv4')
 
     # TF: Nav2 uses global_frame "map"; Aurora SDK uses "slamware_map".
     # Publish map->slamware_map (identity) so map frame exists.
@@ -230,8 +271,7 @@ def generate_launch_description():
     ld.add_action(cmd_vel_mux)
     ld.add_action(depth_gate)
     ld.add_action(vehicle_speed_filter)
-    ld.add_action(TimerAction(period=5.0, actions=[nav_group], condition=IfCondition(LaunchConfiguration('external_tf', default='false'))))
-    ld.add_action(TimerAction(period=15.0, actions=[nav_group], condition=UnlessCondition(LaunchConfiguration('external_tf', default='false'))))
+    ld.add_action(OpaqueFunction(function=_create_nav_with_substituted_params))
     ld.add_action(lifecycle_startup_delayed_ext)
     ld.add_action(lifecycle_startup_delayed_other)
     return ld

@@ -111,7 +111,7 @@ def generate_launch_description():
     wheel_imgsz_arg = DeclareLaunchArgument(
         "wheel_imgsz",
         default_value="640",
-        description="segment_3d: inference size. 480 or 416 for faster inference.",
+        description="segment_3d: inference size. 640 for 16 GB Jetson; 480 or 416 for faster inference on 8 GB.",
     )
     wheel_confidence_arg = DeclareLaunchArgument(
         "wheel_confidence",
@@ -120,13 +120,18 @@ def generate_launch_description():
     )
     model_load_delay_arg = DeclareLaunchArgument(
         "model_load_delay_s",
-        default_value="5.0",
-        description="segment_3d: seconds to delay before loading YOLO/TensorRT; reduces CUDA OOM. Set 10.0 if OOM persists.",
+        default_value="1.0",
+        description="segment_3d: seconds to delay before loading YOLO/TensorRT. 1.0 for 16 GB Jetson; increase if OOM.",
     )
     use_cpu_inference_arg = DeclareLaunchArgument(
         "use_cpu_inference",
-        default_value="true",
-        description="segment_3d: use CPU ONNX tire detection (no GPU). Set false for GPU TensorRT/PyTorch. Default true avoids CUDA OOM.",
+        default_value="false",
+        description="segment_3d: use CPU ONNX tire detection. Set true for CPU fallback. Default false = GPU TensorRT/PyTorch (16 GB Jetson).",
+    )
+    inference_interval_s_arg = DeclareLaunchArgument(
+        "inference_interval_s",
+        default_value="0.1",
+        description="segment_3d: seconds between GPU tire inferences. 0.1 = 10 Hz for 16 GB Jetson.",
     )
 
     # 0) Motor driver — subscribes to cmd_vel, forwards to ESP32; optionally publishes /wheel/odometry
@@ -189,6 +194,7 @@ def generate_launch_description():
             "wheel_imgsz": LaunchConfiguration("wheel_imgsz"),
             "wheel_confidence": LaunchConfiguration("wheel_confidence"),
             "model_load_delay_s": LaunchConfiguration("model_load_delay_s"),
+            "inference_interval_s": LaunchConfiguration("inference_interval_s", default="0.1"),
             "use_cpu_inference": LaunchConfiguration("use_cpu_inference"),
             "sim_tyre_detections": LaunchConfiguration("sim_tyre_detections"),
             "use_yolo": PythonExpression([
@@ -291,6 +297,7 @@ def generate_launch_description():
         wheel_imgsz_arg,
         wheel_confidence_arg,
         model_load_delay_arg,
+        inference_interval_s_arg,
         use_cpu_inference_arg,
         use_bridge_arg,
         perception_only_arg,

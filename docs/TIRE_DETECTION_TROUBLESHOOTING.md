@@ -1,6 +1,8 @@
-# Tire Detection Troubleshooting
+# Tyre Detection Troubleshooting
 
-Troubleshooting guide for the `ultralytics_tire` node and tire detection pipeline on the autonomous tire inspection robot.
+Troubleshooting guide for the `ultralytics_tire` node and tyre detection pipeline on the autonomous tyre inspection robot.
+
+**16 GB Jetson Orin Nano:** GPU is default (`use_cpu_inference:=false`); 640×640 at 10 Hz. OOM workarounds below are for 8 GB or older hardware.
 
 ---
 
@@ -66,7 +68,7 @@ Expected: 23 classes, including `wheel`. If you see 80 classes, the `.pt` file i
 WARNING ⚠️ NMS time limit 2.050s exceeded
 ```
 
-Inference or NMS is taking too long, often due to many candidate detections.
+Inference or NMS is taking too long, often due to many candidate detections. Default is 10 Hz on 16 GB Jetson; if the model cannot keep up, increase `inference_interval_s` (e.g. 0.15 s).
 
 ### Fixes
 
@@ -105,7 +107,7 @@ NvMapMemAllocInternalTagged: 1075072515 error 12
 Cuda Runtime (out of memory)
 ```
 
-The `ultralytics_tire` node crashes immediately when loading the TensorRT engine. Jetson Orin 8GB may have ~4.4 GB free, but memory fragmentation or peak allocation during engine deserialization causes the failure.
+The `ultralytics_tire` node crashes immediately when loading the TensorRT engine. **16 GB Jetson:** OOM is rare; default is 1.0 s model load delay. **8 GB Jetson:** May have ~4.4 GB free; memory fragmentation or peak allocation during engine deserialization can cause failure.
 
 ### Root Cause
 
@@ -123,7 +125,7 @@ Inference is slower (~50–100 ms vs ~5 ms) but avoids OOM.
 
 **Option B: Delay model load**
 
-Let other nodes settle before loading the model. Default is 5.0 s; increase if OOM persists. Use decimal (e.g. `10.0`) to avoid parameter type mismatch:
+Let other nodes settle before loading the model. Default is 1.0 s on 16 GB Jetson (5.0 s on 8 GB); increase if OOM persists. Use decimal (e.g. `10.0`) to avoid parameter type mismatch:
 
 ```bash
 ./scripts/start_mission.sh model_load_delay_s:=10.0
@@ -131,18 +133,18 @@ Let other nodes settle before loading the model. Default is 5.0 s; increase if O
 
 **Option C: Export a smaller TensorRT engine**
 
-Reduces peak memory during load:
+Reduces peak memory during load (for 8 GB Jetson):
 
 ```bash
-IMGSZ=320 WORKSPACE=1 ./scripts/export_tensorrt.sh
+IMGSZ=320 WORKSPACE=4 ./scripts/export_tensorrt.sh
 ```
 
-Then run normally. Slight accuracy trade-off for smaller input size.
+Then run normally. Slight accuracy trade-off for smaller input size. Default on 16 GB: imgsz=640, workspace=8 GB.
 
 **Option D: Combine B + C**
 
 ```bash
-IMGSZ=320 WORKSPACE=1 ./scripts/export_tensorrt.sh
+IMGSZ=320 WORKSPACE=4 ./scripts/export_tensorrt.sh
 ./scripts/start_mission.sh model_load_delay_s:=10.0
 ```
 
@@ -215,9 +217,10 @@ If the mission does not start, check:
 | Issue | Override |
 |-------|----------|
 | Invalid class indices | `prefer_tensorrt_inspection:=false` |
-| CUDA OOM on startup | `prefer_tensorrt_inspection:=false` or `model_load_delay_s:=10.0` |
-| NMS timeout | `wheel_max_det:=50` or `wheel_imgsz:=480` |
+| CUDA OOM on startup (8 GB) | `prefer_tensorrt_inspection:=false` or `model_load_delay_s:=10.0` |
+| NMS timeout | `wheel_max_det:=50` or `wheel_imgsz:=480` or `inference_interval_s:=0.15` |
 | Too many false positives | `wheel_confidence:=0.6` |
+| CPU fallback (8 GB) | `use_cpu_inference:=true` |
 
 Example combined override:
 

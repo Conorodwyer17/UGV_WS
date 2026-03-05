@@ -102,7 +102,7 @@ class UltralyticsSegmentationNode(Node):
         self.declare_parameter("half", True)  # Use FP16 when GPU; launch may pass as bool or string
         self.declare_parameter("max_det", 100)  # Max detections per image; lower reduces NMS time (avoids "NMS time limit exceeded")
         self.declare_parameter("imgsz", 640)  # Inference input size; 480 or 416 for faster inference on Jetson
-        self.declare_parameter("inference_interval_s", 1.5)  # Min seconds between inferences (throttle to reduce CPU)
+        self.declare_parameter("inference_interval_s", 0.1)  # Min seconds between inferences; 10 Hz for 16 GB Jetson
         # Use non-empty default so rclpy infers STRING_ARRAY (empty list would infer BYTE_ARRAY)
         self.declare_parameter(
             "interested_class_names",
@@ -113,7 +113,7 @@ class UltralyticsSegmentationNode(Node):
             ),
         )
         self.declare_parameter("use_vehicle_yolo", False)
-        self.declare_parameter("model_load_delay_s", 5.0)  # Delay before loading model; lets other nodes settle to reduce CUDA OOM
+        self.declare_parameter("model_load_delay_s", 1.0)  # Delay before loading model; 1.0 s for 16 GB Jetson; increase if OOM
 
         # Parse use_vehicle_yolo (launch may pass string "true"/"false")
         use_vehicle_yolo_param = self.get_parameter("use_vehicle_yolo").value
