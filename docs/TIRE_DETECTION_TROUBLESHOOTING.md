@@ -16,11 +16,11 @@ Troubleshooting guide for the `ultralytics_tire` node and tyre detection pipelin
 
 The model expects class indices 0–22 (custom vehicle-parts dataset; wheel = 22). Indices 28, 37, 39, 45, 47 correspond to **COCO80** classes (e.g. 37=skateboard, 45=spoon).
 
-**Note:** The ultralytics_node now filters out-of-range class indices (`class_index < 0 or class_index >= num_classes`) and skips those detections. The warning is logged once per invalid index per session. Valid wheel detections (class 22) are still published.
+**Note:** The ultralytics_node now (1) forces `task='segment'` when loading TensorRT engines to avoid detect misinterpretation, (2) filters out-of-range class indices and skips those detections, and (3) automatically falls back to the PyTorch `.pt` model if the engine produces 5+ invalid class IDs. The warning is logged once per invalid index per session. Valid wheel detections (class 22) are still published.
 
 ### Root Cause
 
-The TensorRT engine (`best_fallback.engine`) was likely built from a model with 80 COCO classes, or from a different `.pt` file than the current `best_fallback.pt`. The engine’s output layer produces COCO indices, while the node uses `best_fallback.pt` metadata (23 classes).
+The TensorRT engine may default to `task=detect` when loaded without an explicit task, causing COCO-like class indices. The node now forces `task='segment'` and falls back to `.pt` if invalid indices persist.
 
 ### Fixes
 
@@ -72,10 +72,12 @@ Inference or NMS is taking too long, often due to many candidate detections. Def
 
 ### Fixes
 
-**A. Reduce max detections** (launch args)
+**A. Reduce max detections** (default is now 50)
+
+The default `wheel_max_det` is 50 to reduce NMS workload. Override if needed:
 
 ```bash
-ros2 launch ugv_nav full_bringup.launch.py wheel_max_det:=50
+ros2 launch ugv_nav full_bringup.launch.py wheel_max_det:=30
 ```
 
 **B. Reduce input size** (faster inference, slight accuracy trade-off)
@@ -93,7 +95,7 @@ ros2 launch ugv_nav full_bringup.launch.py wheel_confidence:=0.6
 **D. Combine for best effect**
 
 ```bash
-ros2 launch ugv_nav full_bringup.launch.py wheel_max_det:=100 wheel_imgsz:=480 wheel_confidence:=0.55
+ros2 launch ugv_nav full_bringup.launch.py wheel_max_det:=50 wheel_imgsz:=480 wheel_confidence:=0.55
 ```
 
 ---
@@ -218,12 +220,12 @@ If the mission does not start, check:
 |-------|----------|
 | Invalid class indices | `prefer_tensorrt_inspection:=false` |
 | CUDA OOM on startup (8 GB) | `prefer_tensorrt_inspection:=false` or `model_load_delay_s:=10.0` |
-| NMS timeout | `wheel_max_det:=50` or `wheel_imgsz:=480` or `inference_interval_s:=0.15` |
+| NMS timeout | `wheel_max_det:=30` (default 50) or `wheel_imgsz:=480` or `inference_interval_s:=0.15` |
 | Too many false positives | `wheel_confidence:=0.6` |
 | CPU fallback (8 GB) | `use_cpu_inference:=true` |
 
 Example combined override:
 
 ```bash
-./scripts/start_mission.sh prefer_tensorrt_inspection:=false wheel_max_det:=100 wheel_imgsz:=480
+./scripts/start_mission.sh prefer_tensorrt_inspection:=false wheel_max_det:=50 wheel_imgsz:=480
 ```

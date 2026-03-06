@@ -44,9 +44,9 @@ if [[ -f "$GENERATED" ]]; then
   mv -f "$GENERATED" "$OUTPUT_ENGINE"
   echo "Done. Set prefer_tensorrt_inspection: true in segment_3d launch to use the engine."
   echo ""
-  echo "If you see 'invalid class index' (28,37,39,45,47) at runtime, the engine may have"
-  echo "been built from a different model. Re-run this script on the Jetson with the"
-  echo "correct best_fallback.pt (23 classes, wheel at id=22). See docs/TIRE_DETECTION_TROUBLESHOOTING.md"
+  echo "If you see 'invalid class index' (28,37,39,45,47) at runtime, the node will auto-fallback"
+  echo "to .pt. The engine may have been built from a different model. Re-run this script with"
+  echo "the correct best_fallback.pt (23 classes, wheel at id=22). See docs/TIRE_DETECTION_TROUBLESHOOTING.md"
 else
   echo "ERROR: Export may have failed; $GENERATED not found"
   exit 1

@@ -41,7 +41,7 @@ Results are written to `docs/vision_benchmark_results.md`. Target: < 10 ms avg f
 
 | Symptom | Solution |
 |---------|----------|
-| Invalid class indices (28, 37, 39, 45, 47) | Re-export TensorRT from correct .pt; or use `prefer_tensorrt_inspection:=false` |
-| NMS time limit exceeded | Reduce `wheel_max_det` (e.g. 50) |
+| Invalid class indices (28, 37, 39, 45, 47) | Node now forces `task='segment'` and auto-falls back to .pt; or use `prefer_tensorrt_inspection:=false` |
+| NMS time limit exceeded | Default `wheel_max_det` is 50; reduce further (e.g. 30) if needed |
 | OOM on startup | `model_load_delay_s:=10.0` or `use_cpu_inference:=true` |
 | No detections | Check `interested_class_names` includes `wheel`; verify camera topic publishing |

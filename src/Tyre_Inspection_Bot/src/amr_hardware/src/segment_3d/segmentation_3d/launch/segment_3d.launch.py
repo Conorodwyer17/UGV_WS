@@ -67,7 +67,7 @@ def _create_tire_nodes(context, wheel_model_path):
                 'segmentation_image_topic': '/ultralytics_tire/segmentation/image',
                 'inference_interval_s': LaunchConfiguration('inference_interval_s', default='0.1'),
                 'interested_class_names': ['wheel'],
-                'max_det': LaunchConfiguration('wheel_max_det', default='100'),
+                'max_det': LaunchConfiguration('wheel_max_det', default='50'),
                 'imgsz': LaunchConfiguration('wheel_imgsz', default='640'),
                 'model_load_delay_s': LaunchConfiguration('model_load_delay_s', default='1.0'),
             }],
@@ -119,8 +119,8 @@ def generate_launch_description():
     )
     wheel_max_det_arg = DeclareLaunchArgument(
         'wheel_max_det',
-        default_value='100',
-        description='Max detections per image for tire model; lower reduces NMS time (avoids "NMS time limit exceeded"). Default 100.',
+        default_value='50',
+        description='Max detections per image for tire model; lower reduces NMS time (avoids "NMS time limit exceeded"). Default 50.',
     )
     wheel_imgsz_arg = DeclareLaunchArgument(
         'wheel_imgsz',

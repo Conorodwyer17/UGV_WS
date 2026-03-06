@@ -100,7 +100,7 @@ class UltralyticsSegmentationNode(Node):
         self.declare_parameter("confidence", 0.25)  # YOLO detection confidence threshold (lower to 0.1 to see weak detections)
         self.declare_parameter("iou", 0.45)  # YOLO NMS IoU threshold
         self.declare_parameter("half", True)  # Use FP16 when GPU; launch may pass as bool or string
-        self.declare_parameter("max_det", 100)  # Max detections per image; lower reduces NMS time (avoids "NMS time limit exceeded")
+        self.declare_parameter("max_det", 50)  # Max detections per image; lower reduces NMS time (avoids "NMS time limit exceeded")
         self.declare_parameter("imgsz", 640)  # Inference input size; 480 or 416 for faster inference on Jetson
         self.declare_parameter("inference_interval_s", 0.1)  # Min seconds between inferences; 10 Hz for 16 GB Jetson
         # Use non-empty default so rclpy infers STRING_ARRAY (empty list would infer BYTE_ARRAY)
@@ -198,12 +198,19 @@ class UltralyticsSegmentationNode(Node):
             except Exception:
                 pass
             time.sleep(delay_s)
+        # Store .pt path for fallback when engine produces invalid class IDs
+        self._inspection_using_engine = resolved_insp_path.endswith(".engine")
+        self._inspection_pt_path = (resolved_insp_path[:-7] + ".pt") if self._inspection_using_engine else resolved_insp_path
         if resolved_insp_path.endswith(".pt"):
             self.get_logger().info(f"WHEEL DETECTION: using {os.path.basename(resolved_insp_path)} at {resolved_insp_path}")
         elif resolved_insp_path.endswith(".engine"):
             self.get_logger().info(f"Using TensorRT engine for inspection: {resolved_insp_path}")
         if os.path.exists(resolved_insp_path):
-            self.inspection_model = YOLO(resolved_insp_path)
+            # Force task='segment' for TensorRT engines to avoid detect misinterpretation (COCO indices)
+            if resolved_insp_path.endswith(".engine"):
+                self.inspection_model = YOLO(resolved_insp_path, task="segment")
+            else:
+                self.inspection_model = YOLO(resolved_insp_path)
             try:
                 names = getattr(self.inspection_model, "names", None)
                 if names is not None:
@@ -258,6 +265,8 @@ class UltralyticsSegmentationNode(Node):
         self._last_raw_log_time = 0.0
         self._raw_log_interval_s = 2.0  # Throttle raw detection logs
         self._warned_invalid_class_indices = set()  # Log each invalid index once per session
+        self._engine_invalid_count = 0  # Count invalid class IDs when using TensorRT engine
+        self._engine_fallback_threshold = 5  # Switch to .pt after this many invalid detections
         _conf = float(self.get_parameter("confidence").value)
         _iou = float(self.get_parameter("iou").value)
         if not (0 <= _conf <= 1):
@@ -405,11 +414,13 @@ class UltralyticsSegmentationNode(Node):
 
         names_dict = seg_result[0].names
         num_classes = len(names_dict) if names_dict is not None else 0
+        invalid_in_this_inference = False
         for index, cls in enumerate(seg_result[0].boxes.cls):
             class_index = int(cls.cpu().numpy())
             # TensorRT engines can return out-of-range class IDs (e.g. 37, 39 when model has 23 classes).
             # Filter strictly by index range; also check dict membership for dict-style names.
             if class_index < 0 or class_index >= num_classes:
+                invalid_in_this_inference = True
                 if class_index not in self._warned_invalid_class_indices:
                     self._warned_invalid_class_indices.add(class_index)
                     valid_max = max(0, num_classes - 1) if num_classes > 0 else 0
@@ -472,6 +483,24 @@ class UltralyticsSegmentationNode(Node):
 
         if do_log_raw:
             self._last_raw_log_time = now
+
+        # Fallback: if using engine and this inference had invalid IDs, count and switch to .pt
+        if invalid_in_this_inference and (
+            getattr(self, "_inspection_using_engine", False)
+            and os.path.exists(getattr(self, "_inspection_pt_path", ""))
+            and self.current_mode == "inspection"
+        ):
+            self._engine_invalid_count += 1
+            if self._engine_invalid_count >= self._engine_fallback_threshold:
+                self.get_logger().warn(
+                    f"TensorRT engine produced invalid class IDs in {self._engine_invalid_count} "
+                    f"inferences. Falling back to PyTorch model: {self._inspection_pt_path}"
+                )
+                self.inspection_model = YOLO(self._inspection_pt_path)
+                self.segmentation_model = self.inspection_model
+                self._inspection_using_engine = False
+                self._engine_invalid_count = 0
+                self._warned_invalid_class_indices.clear()
 
         # Publish the ObjectsSegment message
         if objects_msg.objects:

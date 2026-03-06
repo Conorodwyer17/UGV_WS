@@ -105,8 +105,8 @@ def generate_launch_description():
     )
     wheel_max_det_arg = DeclareLaunchArgument(
         "wheel_max_det",
-        default_value="100",
-        description="segment_3d: max detections. Lower (e.g. 50) reduces NMS time.",
+        default_value="50",
+        description="segment_3d: max detections. Lower (e.g. 50) reduces NMS time. Default 50.",
     )
     wheel_imgsz_arg = DeclareLaunchArgument(
         "wheel_imgsz",
