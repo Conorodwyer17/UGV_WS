@@ -1,7 +1,7 @@
 # Full stack bringup: Aurora, Nav2, perception (segment_3d), inspection manager, motor driver.
-# **Thesis / bench demos:** Prefer modular launches in `ugv_bringup` (`demo_*.launch.py`) so each
-# subsystem runs in isolation on memory-constrained Jetsons. Use this file for full integration
-# reference or 16 GB+ hardware—not as the default demo entry point on 8 GB without tuning.
+# **Memory-constrained Jetsons:** Prefer `ugv_bringup/minimal_tyre_inspection.launch.py` for a lighter
+# stack. Use this file for full integration on hardware with enough unified memory (e.g. 16 GB+)
+# or after tuning; on 8 GB it often needs reduced perception or throttling.
 # Starts everything in order with delays so dependencies are up before clients.
 # Inspection manager is delayed until after Nav2 lifecycle (120s in nav_aurora) so the
 # NavigateToPose action server is available when the mission tries to rotate/drive.

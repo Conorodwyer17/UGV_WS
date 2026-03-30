@@ -18,6 +18,6 @@ setup(
     install_requires=["setuptools"],
     zip_safe=True,
     maintainer="ugv",
-    description="Demo and thesis launch entry points.",
+    description="Modular bringup launches for constrained Jetson.",
     license="Apache-2.0",
 )

@@ -10,8 +10,8 @@
 #
 # **Other profiles** (no extra launch args):
 #   stable_viz — same CPU tyre path as above but **stub motor** (`sim_no_move:=true`) for bench demos.
-#   crash_fallback_seg — GPU TensorRT **`best_fallback.engine`**, **`wheel_imgsz:=640`**, real motor (stress / thesis OOM).
-#   For **visualisation-only** demo: `ros2 launch ugv_bringup demo_full_visualization.launch.py`
+#   crash_fallback_seg — GPU TensorRT **`best_fallback.engine`**, **`wheel_imgsz:=640`**, real motor (stress / OOM recovery).
+#   Lighter stack (memory-constrained): `ros2 launch ugv_bringup minimal_tyre_inspection.launch.py`
 # Run **`tegrastats`** while launching, e.g.:
 #   tegrastats --interval 500 --logfile ~/ugv_ws/benchmarks/tegrastats_fallback_crash.log &
 #
@@ -216,7 +216,7 @@ if [[ ${#LAUNCH_ARGS[@]} -eq 0 ]]; then
         'demo_mode:=true'
         'demo_simulate_nav_success_topic:=/navigation_success'
       )
-      echo "Using MISSION_PROFILE=stable_viz (CPU tyre + stub motor, demo_mode bypasses photo distance gates). For RViz demo consider: ros2 launch ugv_bringup demo_full_visualization.launch.py"
+      echo "Using MISSION_PROFILE=stable_viz (CPU tyre + stub motor, demo_mode bypasses photo distance gates). For a lighter bringup: ros2 launch ugv_bringup minimal_tyre_inspection.launch.py"
       ;;
     *)
       echo "ERROR: Unknown MISSION_PROFILE=${MISSION_PROFILE} (use mission_dedicated_cpu, stable_viz, or crash_fallback_seg)." >&2

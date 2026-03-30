@@ -2,7 +2,7 @@
 # Export a YOLO .pt model to ONNX for ultralytics_node_cpu (CPU inference).
 #
 # Default: best_fallback.pt → best_fallback.onnx (IMGSZ default 224).
-# Tyre model (matches demo_full_visualization + wheel_imgsz default 480):
+# Tyre model (matches default CPU mission tyre path, wheel_imgsz 480):
 #   cd ~/ugv_ws && MODEL_PT=tyre_detection_project/best.pt IMGSZ=480 bash scripts/export_onnx.sh
 #
 # The exported ONNX input size must match launch `wheel_imgsz` (and ultralytics predict imgsz).
@@ -58,7 +58,7 @@ if [[ -f "$GENERATED" ]]; then
   if [[ "$GENERATED" != "$OUTPUT_ONNX" ]]; then
     mv -f "$GENERATED" "$OUTPUT_ONNX"
   fi
-  echo "Done. Match launch wheel_imgsz to IMGSZ=${IMGSZ} (e.g. demo_full_visualization default 480 for tyre ONNX)."
+  echo "Done. Match launch wheel_imgsz to IMGSZ=${IMGSZ} (mission_dedicated_cpu / stable_viz use 480 for tyre ONNX)."
 else
   echo "ERROR: Export may have failed; $GENERATED not found"
   exit 1

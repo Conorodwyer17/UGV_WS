@@ -195,7 +195,7 @@ class VehicleInspectionManager(Node):
         self.declare_parameter("dry_run", False)  # validate goals without sending to Nav2
         # No-motion / bench: skip photo_trigger and capture distance gates once capture is requested (stub motor).
         self.declare_parameter("demo_mode", False)
-        # Empty msg on this topic (e.g. from demo_cycle_tyre_poses) acts like Nav2 success in INSPECT_TIRE when demo_mode.
+        # Empty msg on this topic acts like Nav2 success in INSPECT_TIRE when demo_mode.
         self.declare_parameter("demo_simulate_nav_success_topic", "")
         self.declare_parameter("enable_runtime_diagnostics", True)  # publish /inspection_manager/runtime_diagnostics at 5Hz
         self.declare_parameter("require_sensor_health", False)  # wait for aurora_interface/healthy before SEARCH_VEHICLE
@@ -643,7 +643,7 @@ class VehicleInspectionManager(Node):
         self._sensor_healthy = msg.data
 
     def _on_demo_simulated_nav_success(self, _msg: Empty) -> None:
-        """Thesis/bench: Empty on demo_simulate_nav_success_topic acts like Nav2 arrival (stub motor never reaches goal)."""
+        """Bench: Empty on demo_simulate_nav_success_topic acts like Nav2 arrival (stub motor never reaches goal)."""
         if not self._demo_mode_enabled():
             return
         if self.current_state != MissionState.INSPECT_TIRE:
@@ -839,7 +839,7 @@ class VehicleInspectionManager(Node):
         return bool(v)
 
     def _demo_mode_enabled(self) -> bool:
-        """Thesis / stable_viz: bypass photo distance gates (launch may pass string 'true')."""
+        """stable_viz / bench: bypass photo distance gates (launch may pass string 'true')."""
         v = self.get_parameter("demo_mode").value
         if isinstance(v, bool):
             return v

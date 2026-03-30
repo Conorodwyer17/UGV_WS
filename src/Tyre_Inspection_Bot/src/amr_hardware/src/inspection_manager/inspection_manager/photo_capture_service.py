@@ -36,7 +36,7 @@ class PhotoCaptureService(Node):
         self.declare_parameter('photo_capture_topic', '/inspection_manager/capture_photo')
         self.declare_parameter('capture_result_topic', '/inspection_manager/capture_result')
         self.declare_parameter('metadata_max_age_s', 2.0)
-        # Publish last saved frame for RViz / rqt_image_view (thesis demo); empty = disabled
+        # Publish last saved frame for RViz / rqt_image_view; empty = disabled
         self.declare_parameter('publish_display_topic', '/captured_photo_display')
         
         camera_topic = self.get_parameter('camera_topic').value

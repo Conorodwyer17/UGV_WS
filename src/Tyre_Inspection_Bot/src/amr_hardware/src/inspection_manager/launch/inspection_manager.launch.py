@@ -100,7 +100,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "demo_mode",
                 default_value="false",
-                description="Bypass photo distance gates (stub motor / no-motion thesis demo).",
+                description="Bypass photo distance gates (stub motor / no-motion bench run).",
             ),
             DeclareLaunchArgument(
                 "demo_simulate_nav_success_topic",
