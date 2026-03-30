@@ -87,6 +87,36 @@ def generate_launch_description():
                 default_value="true",
                 description="Gate goals on /stereo/navigation_permitted. Set false for headless runs without depth gate.",
             ),
+            DeclareLaunchArgument(
+                "use_tyre_3d_positions",
+                default_value="false",
+                description="When true, mission can navigate from /tyre_3d_positions (tyre_3d_projection_node) instead of vehicle boxes.",
+            ),
+            DeclareLaunchArgument(
+                "require_detection_topic_at_startup",
+                default_value="true",
+                description="If false, startup does not wait for tire merge topic (use with tyre_3d only / minimal perception).",
+            ),
+            DeclareLaunchArgument(
+                "demo_mode",
+                default_value="false",
+                description="Bypass photo distance gates (stub motor / no-motion thesis demo).",
+            ),
+            DeclareLaunchArgument(
+                "demo_simulate_nav_success_topic",
+                default_value="",
+                description="Subscribe to std_msgs/Empty on this topic → synthetic Nav2 arrival in INSPECT_TIRE when demo_mode (e.g. /navigation_success).",
+            ),
+            DeclareLaunchArgument(
+                "use_tyre_geometry",
+                default_value="true",
+                description="Infer vehicle axes and visit order from /tyre_3d_positions (stable) instead of jittery vehicle box when possible.",
+            ),
+            DeclareLaunchArgument(
+                "use_batch_waypoints",
+                default_value="false",
+                description="Use Nav2 FollowWaypoints with full map-frame approach list (perimeter+standoff per tyre).",
+            ),
             Node(
                 package="inspection_manager",
                 executable="photo_capture_service",
@@ -115,6 +145,20 @@ def generate_launch_description():
                         "vehicle_boxes_topic": vehicle_fallback_topic,
                         "sensor_health_timeout": LaunchConfiguration("sensor_health_timeout", default="30.0"),
                         "require_nav_permitted": LaunchConfiguration("require_nav_permitted", default="true"),
+                        "use_tyre_3d_positions": LaunchConfiguration(
+                            "use_tyre_3d_positions", default="false"
+                        ),
+                        "require_detection_topic_at_startup": LaunchConfiguration(
+                            "require_detection_topic_at_startup", default="true"
+                        ),
+                        "demo_mode": LaunchConfiguration("demo_mode", default="false"),
+                        "demo_simulate_nav_success_topic": LaunchConfiguration(
+                            "demo_simulate_nav_success_topic", default=""
+                        ),
+                        "use_tyre_geometry": LaunchConfiguration("use_tyre_geometry", default="true"),
+                        "use_batch_waypoints": LaunchConfiguration(
+                            "use_batch_waypoints", default="false"
+                        ),
                     },
                 ],
             ),

@@ -4,76 +4,12 @@
 # depth_to_registered_pointcloud -> /segmentation_processor/registered_pointcloud, /camera/depth/points.
 # Bridge deprecated: use_bridge=false is default; bridge opt-in for legacy firmware 1.2.
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, GroupAction, OpaqueFunction, TimerAction
+from launch.actions import DeclareLaunchArgument, GroupAction, TimerAction
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch.conditions import IfCondition, UnlessCondition
-from launch.utilities import perform_substitutions
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 import os
-
-
-def _create_tire_nodes(context, wheel_model_path):
-    """Create ultralytics_tire_node (GPU) or ultralytics_tire_cpu (CPU) based on use_cpu_inference."""
-    use_cpu = perform_substitutions(context, [LaunchConfiguration('use_cpu_inference', default='false')])
-    use_cpu = str(use_cpu).strip().lower() in ('true', '1', 'yes')
-
-    if use_cpu:
-        onnx_path = wheel_model_path.replace('.pt', '.onnx')
-        workspace = os.environ.get("UGV_WS", os.path.expanduser("~/ugv_ws"))
-        if not os.path.isfile(os.path.expanduser(onnx_path)):
-            onnx_path = os.path.join(workspace, "src", "Tyre_Inspection_Bot", "best_fallback.onnx")
-        return [
-            Node(
-                package='segmentation_3d',
-                executable='ultralytics_node_cpu',
-                name='ultralytics_tire',
-                output='screen',
-                parameters=[{
-                    'use_sim_time': LaunchConfiguration('use_sim_time', default='false'),
-                    'model_path': onnx_path,
-                    'camera_rgb_topic': LaunchConfiguration('camera_rgb_topic'),
-                    'objects_segment_topic': '/ultralytics_tire/segmentation/objects_segment',
-                    'imgsz': 224,  # CPU: 224 for ~5 Hz; wheel_imgsz is for GPU
-                    'conf_threshold': LaunchConfiguration('wheel_confidence'),
-                    'inference_interval_s': 0.2,
-                    'interested_class_names': ['wheel'],
-                }],
-                condition=IfCondition(LaunchConfiguration('use_yolo', default='true')),
-            )
-        ]
-
-    prefer_trt_val = perform_substitutions(context, [LaunchConfiguration('prefer_tensorrt_inspection')])
-    prefer_trt_str = str(prefer_trt_val).strip().lower() if prefer_trt_val else 'auto'
-    return [
-        Node(
-            package='segmentation_3d',
-            executable='ultralytics_node',
-            name='ultralytics_tire',
-            output='screen',
-            parameters=[{
-                'use_sim_time': LaunchConfiguration('use_sim_time', default='false'),
-                'camera_rgb_topic': LaunchConfiguration('camera_rgb_topic'),
-                'inspection_model': wheel_model_path,
-                'use_vehicle_yolo': LaunchConfiguration('use_vehicle_yolo', default='false'),
-                'log_raw_detections': True,
-                'confidence': LaunchConfiguration('wheel_confidence'),
-                'device': LaunchConfiguration('device'),
-                'half': LaunchConfiguration('half'),
-                'fixed_mode': 'inspection',
-                'prefer_tensorrt_inspection': prefer_trt_str,
-                'subscribe_mode_topic': False,
-                'objects_segment_topic': '/ultralytics_tire/segmentation/objects_segment',
-                'segmentation_image_topic': '/ultralytics_tire/segmentation/image',
-                'inference_interval_s': LaunchConfiguration('inference_interval_s', default='0.1'),
-                'interested_class_names': ['wheel'],
-                'max_det': LaunchConfiguration('wheel_max_det', default='50'),
-                'imgsz': LaunchConfiguration('wheel_imgsz', default='640'),
-                'model_load_delay_s': LaunchConfiguration('model_load_delay_s', default='1.0'),
-            }],
-            condition=IfCondition(LaunchConfiguration('use_yolo', default='true')),
-        )
-    ]
 
 
 def generate_launch_description():
@@ -125,12 +61,22 @@ def generate_launch_description():
     wheel_imgsz_arg = DeclareLaunchArgument(
         'wheel_imgsz',
         default_value='640',
-        description='Inference input size for tire model; 480 or 416 for faster inference on Jetson. Default 640.',
+        description='GPU tyre model inference size. CPU ONNX uses tyre_onnx_imgsz (default 480) to match export.',
+    )
+    tyre_onnx_imgsz_arg = DeclareLaunchArgument(
+        'tyre_onnx_imgsz',
+        default_value='480',
+        description='Square input side for ultralytics_node_cpu (ONNX). Must match export_onnx.sh / model.export(imgsz=...). Independent of wheel_imgsz.',
     )
     device_arg = DeclareLaunchArgument(
         'device',
         default_value='0',
         description='Inference device: 0 (GPU) or cpu when no CUDA.',
+    )
+    depth_registered_publish_hz_arg = DeclareLaunchArgument(
+        'depth_registered_publish_hz',
+        default_value='0.0',
+        description='Max depth registered pointcloud publish rate (Hz); 0.0 = every frame.',
     )
     half_arg = DeclareLaunchArgument(
         'half',
@@ -172,14 +118,15 @@ def generate_launch_description():
         default_value='0.0',
         description='Probability (0-1) that simulated_detection skips a tire (tests PCL fallback, return-later). Use with use_stress_test.',
     )
-    # TensorRT: enable by default when best_fallback.engine exists (PERFORMANCE_TUNING, acc-qcar2 pattern)
+    # TensorRT: prefer tyre_detection_project/best.engine when present, else Tyre_Inspection_Bot/best_fallback.engine
     _workspace = os.environ.get("UGV_WS", os.path.expanduser("~/ugv_ws"))
-    _engine_path = os.path.join(_workspace, "src", "Tyre_Inspection_Bot", "best_fallback.engine")
-    _prefer_tensorrt_default = os.path.isfile(_engine_path)
+    _tyre_engine_path = os.path.join(_workspace, "tyre_detection_project", "best.engine")
+    _fallback_engine_path = os.path.join(_workspace, "src", "Tyre_Inspection_Bot", "best_fallback.engine")
+    _prefer_tensorrt_default = os.path.isfile(_tyre_engine_path) or os.path.isfile(_fallback_engine_path)
     prefer_tensorrt_inspection_arg = DeclareLaunchArgument(
         'prefer_tensorrt_inspection',
         default_value=str(_prefer_tensorrt_default).lower(),
-        description='Use TensorRT engine for wheel detection. Set false if you see "invalid class index" (28,37,39,45,47) - engine may need re-export from best_fallback.pt.',
+        description='Use TensorRT engine for tyre node. Set false if you see invalid class indices.',
     )
     use_vehicle_yolo_arg = DeclareLaunchArgument(
         'use_vehicle_yolo',
@@ -201,6 +148,31 @@ def generate_launch_description():
         default_value='1.0',
         description='Seconds to delay before loading YOLO/TensorRT model. 1.0 for 16 GB Jetson; increase if OOM persists.',
     )
+    enable_tyre_3d_projection_arg = DeclareLaunchArgument(
+        'enable_tyre_3d_projection',
+        default_value='true',
+        description='Launch tyre_3d_projection_node (wheel masks + depth -> /tyre_3d_positions in slamware_map).',
+    )
+    tyre_3d_sync_slop_s_arg = DeclareLaunchArgument(
+        'tyre_3d_sync_slop_s',
+        default_value='2.0',
+        description='tyre_3d: max |stamp_seg−stamp_depth| (s); latest mode warns above this but still projects.',
+    )
+    tyre_3d_depth_pairing_mode_arg = DeclareLaunchArgument(
+        'tyre_3d_depth_pairing_mode',
+        default_value='latest',
+        description='tyre_3d: "latest" = cache depth + pair each ObjectsSegment (recommended). "approximate" = message_filters.',
+    )
+    tyre_3d_tf_lookup_use_latest_arg = DeclareLaunchArgument(
+        'tyre_3d_tf_lookup_use_latest',
+        default_value='false',
+        description='tyre_3d: use latest TF first (stub/static TF / extrapolation workarounds).',
+    )
+    minimal_perception_arg = DeclareLaunchArgument(
+        'minimal_perception',
+        default_value='false',
+        description='Jetson OOM: skip semantic fusion, vehicle RViz markers, tire segmentation_processor, PCL fallback nodes.',
+    )
 
     # Semantic fusion for vehicle detection (Aurora 2.11) — same intrinsics as depth pipeline.
     # Default: Aurora-only (fallback_vehicle_boxes_topic=""). Set fallback to /darknet_ros_3d/vehicle_bounding_boxes for YOLO fallback if semantic missing.
@@ -219,19 +191,95 @@ def generate_launch_description():
             'semantic_stale_s': 2.0,
             'depth_stale_s': 2.0,
         }],
-        condition=UnlessCondition(LaunchConfiguration('use_synthetic_vehicle', default='false')),
+        condition=IfCondition(
+            PythonExpression([
+                "'", LaunchConfiguration('use_synthetic_vehicle', default='false'), "' != 'true' and '",
+                LaunchConfiguration('minimal_perception', default='false'), "' != 'true'",
+            ])
+        ),
     )
 
-    # Wheel detection: canonical model best_fallback.pt (wheel class)
+    # Tyre model: tyre_detection_project/best.engine (or .pt); legacy fallback best_fallback.pt
     _bot_dir = os.path.join(_workspace, "src", "Tyre_Inspection_Bot")
     wheel_model_path = os.path.join(_bot_dir, "best_fallback.pt")
+    _tyre_proj = os.path.join(_workspace, "tyre_detection_project")
+    _tyre_eng = os.path.join(_tyre_proj, "best.engine")
+    _tyre_pt = os.path.join(_tyre_proj, "best.pt")
+    _default_wheel_inspection = (
+        _tyre_eng if os.path.isfile(_tyre_eng) else (_tyre_pt if os.path.isfile(_tyre_pt) else wheel_model_path)
+    )
+    wheel_inspection_model_arg = DeclareLaunchArgument(
+        'wheel_inspection_model',
+        default_value=_default_wheel_inspection,
+        description='Tyre segmentation model path (.engine preferred, .pt, or legacy best_fallback.pt).',
+    )
     # Vehicle boxes from Aurora by default; enable use_vehicle_yolo for YOLO fallback only.
     _use_vehicle_yolo = LaunchConfiguration('use_vehicle_yolo', default='false')
-    # ultralytics_tire_node uses OpaqueFunction to resolve prefer_tensorrt_inspection at launch time and convert
-    # to string (avoids InvalidParameterTypeException when launch passes bool from prefer_tensorrt_inspection:=false)
-    ultralytics_tire_action = OpaqueFunction(
-        function=_create_tire_nodes,
-        args=[wheel_model_path],
+    # Tyre detection: exactly one of CPU ONNX or GPU/Torch. IfCondition + PythonExpression is evaluated at
+    # launch (OpaqueFunction + perform_substitutions was unreliable for use_cpu_inference in some setups).
+    _tire_class_names = ['tyre', 'wheel', 'tire', 'car_tire', 'car_tyre', 'car-tire', 'car-tyre']
+    # Valid Python after substitution, e.g. 'true' == 'true' and ('true' in (...) or 'cpu' == 'cpu')
+    # Avoid .lower() on substituted fragments (can break eval if quotes misalign).
+    _cpu_tyre_expr = PythonExpression([
+        "'", LaunchConfiguration('use_yolo', default='true'),
+        "' == 'true' and ('",
+        "'", LaunchConfiguration('use_cpu_inference', default='false'),
+        "' in ('true', 'True', '1', 'yes', 'on') or '",
+        "'", LaunchConfiguration('device', default='0'),
+        "' == 'cpu')",
+    ])
+    _gpu_tyre_expr = PythonExpression([
+        "'", LaunchConfiguration('use_yolo', default='true'),
+        "' == 'true' and not ('",
+        "'", LaunchConfiguration('use_cpu_inference', default='false'),
+        "' in ('true', 'True', '1', 'yes', 'on') or '",
+        "'", LaunchConfiguration('device', default='0'),
+        "' == 'cpu')",
+    ])
+    ultralytics_tire_cpu_node = Node(
+        package='segmentation_3d',
+        executable='ultralytics_node_cpu',
+        name='ultralytics_tire',
+        output='screen',
+        parameters=[{
+            'use_sim_time': LaunchConfiguration('use_sim_time', default='false'),
+            'model_path': LaunchConfiguration('wheel_inspection_model'),
+            'camera_rgb_topic': LaunchConfiguration('camera_rgb_topic'),
+            'objects_segment_topic': '/ultralytics_tire/segmentation/objects_segment',
+            'segmentation_image_topic': '/ultralytics_tire/segmentation/image',
+            'imgsz': LaunchConfiguration('tyre_onnx_imgsz', default='480'),
+            'conf_threshold': LaunchConfiguration('wheel_confidence'),
+            'inference_interval_s': LaunchConfiguration('inference_interval_s', default='0.2'),
+            'interested_class_names': _tire_class_names,
+        }],
+        condition=IfCondition(_cpu_tyre_expr),
+    )
+    ultralytics_tire_gpu_node = Node(
+        package='segmentation_3d',
+        executable='ultralytics_node',
+        name='ultralytics_tire',
+        output='screen',
+        parameters=[{
+            'use_sim_time': LaunchConfiguration('use_sim_time', default='false'),
+            'camera_rgb_topic': LaunchConfiguration('camera_rgb_topic'),
+            'inspection_model': LaunchConfiguration('wheel_inspection_model'),
+            'use_vehicle_yolo': LaunchConfiguration('use_vehicle_yolo', default='false'),
+            'log_raw_detections': True,
+            'confidence': LaunchConfiguration('wheel_confidence'),
+            'device': LaunchConfiguration('device', default='0'),
+            'half': LaunchConfiguration('half'),
+            'fixed_mode': 'inspection',
+            'prefer_tensorrt_inspection': LaunchConfiguration('prefer_tensorrt_inspection'),
+            'subscribe_mode_topic': False,
+            'objects_segment_topic': '/ultralytics_tire/segmentation/objects_segment',
+            'segmentation_image_topic': '/ultralytics_tire/segmentation/image',
+            'inference_interval_s': LaunchConfiguration('inference_interval_s', default='0.1'),
+            'interested_class_names': _tire_class_names,
+            'max_det': LaunchConfiguration('wheel_max_det', default='50'),
+            'imgsz': LaunchConfiguration('wheel_imgsz', default='640'),
+            'model_load_delay_s': LaunchConfiguration('model_load_delay_s', default='1.0'),
+        }],
+        condition=IfCondition(_gpu_tyre_expr),
     )
     ultralytics_vehicle_node = Node(
         package='segmentation_3d',
@@ -244,7 +292,7 @@ def generate_launch_description():
             'inspection_model': wheel_model_path,
             'log_raw_detections': LaunchConfiguration('log_raw_detections'),
             'confidence': LaunchConfiguration('confidence'),
-            'device': LaunchConfiguration('device'),
+            'device': LaunchConfiguration('device', default='0'),
             'half': LaunchConfiguration('half'),
             'fixed_mode': 'navigation',
             'subscribe_mode_topic': False,
@@ -301,6 +349,7 @@ def generate_launch_description():
             'output_topic': '/segmentation_processor/registered_pointcloud',
             'output_frame_id': 'camera_depth_optical_frame',
             'depth_points_topic': '/camera/depth/points',
+            'publish_rate_hz': LaunchConfiguration('depth_registered_publish_hz', default='0.0'),
         }],
         condition=UnlessCondition(LaunchConfiguration("use_bridge")),
     )
@@ -317,6 +366,7 @@ def generate_launch_description():
             'output_topic': '/segmentation_processor/registered_pointcloud',
             'output_frame_id': 'camera_depth_optical_frame',
             'depth_points_topic': '/camera/depth/points',
+            'publish_rate_hz': LaunchConfiguration('depth_registered_publish_hz', default='0.0'),
         }],
         condition=IfCondition(LaunchConfiguration("use_bridge")),
     )
@@ -359,6 +409,9 @@ def generate_launch_description():
                 'working_frame': 'slamware_map',
             },
         ],
+        condition=UnlessCondition(
+            PythonExpression(["'", LaunchConfiguration('minimal_perception', default='false'), "' == 'true'"])
+        ),
     )
 
     # Point-cloud tire fallback: when YOLO misses tires, use PCL clustering in vehicle ROI
@@ -369,7 +422,12 @@ def generate_launch_description():
         name='tire_detector_pcl',
         output='screen',
         parameters=[config_pcl, {'use_sim_time': LaunchConfiguration('use_sim_time', default='false')}],
-        condition=IfCondition(LaunchConfiguration('pcl_fallback_enabled')),
+        condition=IfCondition(
+            PythonExpression([
+                "'", LaunchConfiguration('pcl_fallback_enabled'), "' == 'true' and '",
+                LaunchConfiguration('minimal_perception', default='false'), "' != 'true'",
+            ])
+        ),
     )
     tire_merger_node = Node(
         package='segmentation_3d',
@@ -377,7 +435,12 @@ def generate_launch_description():
         name='tire_merger',
         output='screen',
         parameters=[config_pcl, {'use_sim_time': LaunchConfiguration('use_sim_time', default='false')}],
-        condition=IfCondition(LaunchConfiguration('pcl_fallback_enabled')),
+        condition=IfCondition(
+            PythonExpression([
+                "'", LaunchConfiguration('pcl_fallback_enabled'), "' == 'true' and '",
+                LaunchConfiguration('minimal_perception', default='false'), "' != 'true'",
+            ])
+        ),
     )
 
     # Converts BoundingBoxes3d -> MarkerArray so RViz can show vehicle bounding boxes on the map
@@ -388,7 +451,12 @@ def generate_launch_description():
         name='centroid_servo',
         output='screen',
         parameters=[config_centroid, {'use_sim_time': LaunchConfiguration('use_sim_time', default='false')}],
-        condition=IfCondition(LaunchConfiguration('centroid_servo_enabled')),
+        condition=IfCondition(
+            PythonExpression([
+                "'", LaunchConfiguration('centroid_servo_enabled'), "' == 'true' and '",
+                LaunchConfiguration('minimal_perception', default='false'), "' != 'true'",
+            ])
+        ),
     )
     vehicle_boxes_marker_node = Node(
         package='segmentation_3d',
@@ -400,6 +468,28 @@ def generate_launch_description():
             'input_topic': '/aurora_semantic/vehicle_bounding_boxes',
             'marker_topic': '/aurora_semantic/vehicle_markers',
         }],
+        condition=UnlessCondition(
+            PythonExpression(["'", LaunchConfiguration('minimal_perception', default='false'), "' == 'true'"])
+        ),
+    )
+
+    tyre_3d_projection_node = Node(
+        package='segmentation_3d',
+        executable='tyre_3d_projection_node',
+        name='tyre_3d_projection',
+        output='screen',
+        parameters=[{
+            'use_sim_time': LaunchConfiguration('use_sim_time', default='false'),
+            'output_frame': 'slamware_map',
+            'objects_segment_topic': '/ultralytics_tire/segmentation/objects_segment',
+            'depth_topic': '/slamware_ros_sdk_server_node/depth_image_raw',
+            'camera_info_topic': '/camera/depth/camera_info',
+            'rgb_topic': LaunchConfiguration('camera_rgb_topic'),
+            'sync_slop_s': LaunchConfiguration('tyre_3d_sync_slop_s', default='2.0'),
+            'depth_pairing_mode': LaunchConfiguration('tyre_3d_depth_pairing_mode', default='latest'),
+            'tf_lookup_use_latest': LaunchConfiguration('tyre_3d_tf_lookup_use_latest', default='false'),
+        }],
+        condition=IfCondition(LaunchConfiguration('enable_tyre_3d_projection', default='true')),
     )
 
     # Vehicle processor only when use_vehicle_yolo; tire processor and PCL always in pipeline.
@@ -415,6 +505,7 @@ def generate_launch_description():
             segmentation_processor_tire_node,
             tire_detector_pcl_node,
             tire_merger_node,
+            tyre_3d_projection_node,
         ],
     )
 
@@ -428,7 +519,9 @@ def generate_launch_description():
         wheel_confidence_arg,
         wheel_max_det_arg,
         wheel_imgsz_arg,
+        tyre_onnx_imgsz_arg,
         device_arg,
+        depth_registered_publish_hz_arg,
         half_arg,
         pcl_fallback_arg,
         centroid_servo_arg,
@@ -442,10 +535,17 @@ def generate_launch_description():
         use_cpu_inference_arg,
         inference_interval_s_arg,
         model_load_delay_arg,
+        enable_tyre_3d_projection_arg,
+        tyre_3d_sync_slop_s_arg,
+        tyre_3d_depth_pairing_mode_arg,
+        tyre_3d_tf_lookup_use_latest_arg,
+        wheel_inspection_model_arg,
+        minimal_perception_arg,
         aurora_semantic_fusion_node,
         vehicle_boxes_marker_node,
         ultralytics_vehicle_node,
-        ultralytics_tire_action,
+        ultralytics_tire_cpu_node,
+        ultralytics_tire_gpu_node,
         simulated_detection_node,
         centroid_servo_node,
         aurora_depth_camera_info_node,

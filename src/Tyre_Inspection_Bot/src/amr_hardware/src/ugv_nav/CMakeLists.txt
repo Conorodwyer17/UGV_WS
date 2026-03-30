@@ -34,6 +34,7 @@ install(
     scripts/navigation_permitted_publisher.py
     scripts/vehicle_speed_filter_node.py
     scripts/cmd_vel_mux_node.py
+    scripts/world_frame_tf_publisher.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

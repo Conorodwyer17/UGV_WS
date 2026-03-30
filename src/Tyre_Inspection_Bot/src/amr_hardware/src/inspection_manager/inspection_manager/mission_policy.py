@@ -110,7 +110,7 @@ class MissionPolicy:
     # Goals
     goal_max_age_s: float = 5.0  # Reject goals computed from detections older than this
     approach_offset: float = 0.5
-    tire_offset: float = 0.4
+    tire_offset: float = 0.3
     approach_goal_tolerance_m: float = 0.35
     tire_goal_tolerance_m: float = 0.25
     reuse_approach_goal_on_retry: bool = True

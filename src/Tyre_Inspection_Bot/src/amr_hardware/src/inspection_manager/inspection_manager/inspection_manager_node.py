@@ -2,17 +2,19 @@ import json
 import math
 import os
 import time
-from typing import List, Optional, Dict, Any
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+from typing import List, Optional, Dict, Any, Tuple
 
 import rclpy
 from action_msgs.msg import GoalStatus
 from rclpy.action import ActionClient
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
-from geometry_msgs.msg import PoseStamped, Quaternion, Twist
+from geometry_msgs.msg import PoseArray, PoseStamped, Quaternion, Twist
 from nav_msgs.msg import Odometry
 from nav2_msgs.action import FollowWaypoints, NavigateToPose
-from std_msgs.msg import Bool, Header, String  # String for segmentation_mode
+from nav2_msgs.srv import ClearEntireCostmap
+from std_msgs.msg import Bool, Empty, Header, String  # String for segmentation_mode
 from gb_visual_detection_3d_msgs.msg import BoundingBoxes3d, BoundingBox3d
 from visualization_msgs.msg import Marker, MarkerArray
 from ament_index_python.packages import get_package_share_directory
@@ -31,7 +33,13 @@ from .mission_policy import (
     StartupInvariants,
     load_policy_from_node,
 )
-from .geometry_utils import quaternion_from_yaw, yaw_from_quaternion
+from .geometry_utils import (
+    pose_stamped_from_standoff_xy,
+    quaternion_from_yaw,
+    standoff_goal_robot_tyre_xy,
+    standoff_goal_vehicle_center_tire_xy,
+    yaw_from_quaternion,
+)
 from .perception_handler import (
     parse_vehicle_labels,
     log_bounding_box,
@@ -39,10 +47,22 @@ from .perception_handler import (
     tire_position_label,
     find_tire_for_inspection,
 )
-from .goal_generator import compute_box_goal
+from .goal_generator import COSTMAP_INSCRIBED_INFLATED, compute_box_goal
 from .navigation_controller import send_follow_waypoints, send_nav_goal
-from .vehicle_modeler import estimate_tire_positions, estimate_tire_positions_from_box, box_front_rear_points
-from .transformer import get_current_pose as tf_get_current_pose, transform_pose as tf_transform_pose
+from .vehicle_modeler import (
+    box_front_rear_points,
+    estimate_tire_positions,
+    estimate_tire_positions_from_box,
+    get_vehicle_footprint,
+)
+from .tyre_order import classify_robot_side, inspection_order_indices, robot_lon_lat
+from .vehicle_waypoints import build_tyre_approach_waypoints
+from .tyre_geometry import TyreBasedVehicleGeometry, tyre_geometry_from_poses
+from .transformer import (
+    get_current_pose as tf_get_current_pose,
+    transform_pose as tf_transform_pose,
+    transform_vector_xy as tf_transform_vector_xy,
+)
 
 class VehicleInspectionManager(Node):
     """Mission manager for autonomous vehicle tire inspection using Aurora SLAM and detection."""
@@ -55,7 +75,7 @@ class VehicleInspectionManager(Node):
         self.declare_parameter("tire_label", "tire")  # Colab best.pt uses "tire"; use "car-tire" for legacy; must match segment_3d
         self.declare_parameter("standoff_distance", 2.0)  # Distance to stop before vehicle
         self.declare_parameter("approach_offset", 0.5)  # Offset when approaching vehicle
-        self.declare_parameter("tire_offset", 0.4)  # Offset when approaching tire
+        self.declare_parameter("tire_offset", 1.0)  # Standoff when approaching tire (m); tyre_3d uses robot–tyre geometry
         self.declare_parameter("tire_staging_min_m", 0.7)  # Min distance for tire approach (staging); then IBVS/ICP refinement for final approach
         self.declare_parameter("detection_topic", "/darknet_ros_3d/tire_bounding_boxes")  # Tire detection topic (dual perception default)
         self.declare_parameter("vehicle_detection_topic", "/darknet_ros_3d/vehicle_bounding_boxes")  # Vehicle boxes from YOLO 3D stream
@@ -89,7 +109,7 @@ class VehicleInspectionManager(Node):
         self.declare_parameter("planned_tire_fallback_enabled", True)  # allow planned tire goals if no tire boxes
         self.declare_parameter("strict_planned_tire_order", True)  # true = always use pop(0) for tires 2-4 (2nd→3rd→4th nearest); no detection reordering
         self.declare_parameter("planned_tire_box_extent_m", 0.25)  # half-extent for planned tire box
-        self.declare_parameter("refinement_max_distance_m", 0.6)  # when a wheel detection is within this distance of planned tire, use detection center as goal (dynamic refinement)
+        self.declare_parameter("refinement_max_distance_m", 1.2)  # when a wheel detection is within this distance of planned/tyre3d tire, use detection center as goal
         self.declare_parameter("refinement_ema_alpha", 0.3)  # EMA smoothing for refinement (0=no smoothing, 1=full); reduces goal flicker from detection jitter
         self.declare_parameter("max_vehicle_reacquire_attempts", 2)  # bounded reacquire loops before moving to next vehicle
         self.declare_parameter("rotation_angle", 0.785)  # 45 degrees in radians
@@ -159,7 +179,11 @@ class VehicleInspectionManager(Node):
         self.declare_parameter("approach_nearest_corner", True)  # true = go to nearest corner (tire); false = approach nearest face (can end at bumper)
         self.declare_parameter("try_next_corner_on_nav_fail", True)  # when corner unreachable, try next nearest instead of retrying same
         self.declare_parameter("skip_tire_on_nav_failure", True)  # when True, skip unreachable tire on first Nav2 FAILED/ABORTED (research: stop_on_failure: false)
-        self.declare_parameter("use_follow_waypoints", False)  # when True, send 4 tire poses as FollowWaypoints batch (requires PhotoAtWaypoint for capture)
+        self.declare_parameter("use_follow_waypoints", False)  # when True, send 4 tire poses as FollowWaypoints batch (requires waypoint task plugin for capture)
+        self.declare_parameter(
+            "use_batch_waypoints",
+            False,
+        )  # when True, build full approach list (perimeter+standoff) in map frame and FollowWaypoints once
         self.declare_parameter("reuse_approach_goal_on_retry", True)  # keep approach goal stable across retries
         self.declare_parameter("max_capture_retries", 2)  # retry photo capture this many times on failure
         self.declare_parameter("capture_verify_timeout_s", 10.0)  # timeout waiting for capture_result in VERIFY_CAPTURE
@@ -169,6 +193,10 @@ class VehicleInspectionManager(Node):
         self.declare_parameter("capture_wheel_required_frames", 1)  # number of detection frames with wheel in view before triggering photo (1 = one sighting enough)
         self.declare_parameter("capture_on_wheel_timeout", True)  # if True: on wheel-wait timeout still take photo and proceed; if False: skip this tire
         self.declare_parameter("dry_run", False)  # validate goals without sending to Nav2
+        # No-motion / bench: skip photo_trigger and capture distance gates once capture is requested (stub motor).
+        self.declare_parameter("demo_mode", False)
+        # Empty msg on this topic (e.g. from demo_cycle_tyre_poses) acts like Nav2 success in INSPECT_TIRE when demo_mode.
+        self.declare_parameter("demo_simulate_nav_success_topic", "")
         self.declare_parameter("enable_runtime_diagnostics", True)  # publish /inspection_manager/runtime_diagnostics at 5Hz
         self.declare_parameter("require_sensor_health", False)  # wait for aurora_interface/healthy before SEARCH_VEHICLE
         self.declare_parameter("sensor_health_timeout", 30.0)  # seconds to wait for sensor health in INIT
@@ -180,6 +208,19 @@ class VehicleInspectionManager(Node):
         self.declare_parameter("detection_stamp_max_age_s", 0.5)  # strict: reject detections older than this before creating goals (TF/time sync)
         self.declare_parameter("goal_costmap_precheck", True)  # reject goal if in occupied costmap cell (system_reaudit_report; reduces Nav2 failures)
         self.declare_parameter("goal_costmap_get_cost_service", "local_costmap/get_cost_local_costmap")  # Nav2 GetCosts service for precheck
+        self.declare_parameter(
+            "robot_pose_costmap_get_cost_service",
+            "global_costmap/get_cost_global_costmap",
+        )  # GetCosts on global costmap at robot pose (lethal start check)
+        self.declare_parameter("pre_nav_lethal_escape_enabled", True)
+        self.declare_parameter("pre_nav_lethal_max_backup_attempts", 2)
+        self.declare_parameter("pre_nav_lethal_backup_distance_m", 0.35)
+        self.declare_parameter("pre_nav_lethal_backup_speed_m", 0.12)
+        self.declare_parameter("post_capture_backup_enable", True)
+        self.declare_parameter("post_capture_backup_distance_m", 0.45)
+        self.declare_parameter("post_capture_backup_speed_m", 0.12)
+        self.declare_parameter("post_capture_costmap_settle_s", 0.35)
+        self.declare_parameter("stop_cmd_vel_repeat", 3)
         self.declare_parameter("startup_detection_wait_timeout_s", 30.0)  # wait for first detection message before mission start; abort if exceeded
         self.declare_parameter("mission_log_path", "")  # JSONL event log (mission_start, state_transition, nav_result, etc.)
         self.declare_parameter("mission_report_path", "")  # full report JSON at mission end
@@ -190,11 +231,44 @@ class VehicleInspectionManager(Node):
         self.declare_parameter("centroid_servo_enabled", True)  # when True, hand off to centroid servo when distance_remaining < centroid_servo_proximity_m
         self.declare_parameter("centroid_servo_proximity_m", 0.5)  # hand off to centroid when distance_remaining < this
         self.declare_parameter("centroid_servo_require_detection_near_expected", True)  # only hand off when a tire detection is within capture_max_distance_detection_to_expected_tire_m of expected tire
-        self.declare_parameter("capture_max_distance_detection_to_expected_tire_m", 0.5)  # max xy distance from detection center to expected tire position to accept for centroid/capture
+        self.declare_parameter("capture_max_distance_detection_to_expected_tire_m", 1.0)  # max xy distance detection→expected for centroid/capture (wider when vehicle box is poor)
         self.declare_parameter("centroid_servo_wait_for_detection_timeout_s", 10.0)  # after this many seconds at tire, enable centroid even if no detection near expected (avoids blocking forever)
         self.declare_parameter("return_later_enabled", True)  # when True, retry skipped tires after completing remaining tires on same vehicle
         self.declare_parameter("max_return_later_passes", 1)  # how many retry passes for deferred tires before giving up
         self.declare_parameter("publish_mission_snapshot", False)  # when True, publish /inspection_debug/mission_snapshot at 1 Hz (observability_upgrade)
+        # Direct tyre localisation (tyre_3d_projection_node): navigate from depth+YOLO without relying on vehicle boxes
+        self.declare_parameter("use_tyre_3d_positions", False)
+        self.declare_parameter("tyre_3d_positions_topic", "/tyre_3d_positions")
+        self.declare_parameter("tyre_3d_stale_s", 2.0)  # max age of /tyre_3d_positions header to consider "fresh"
+        self.declare_parameter("tyre_3d_min_range_m", 0.4)
+        self.declare_parameter("tyre_3d_max_range_m", 5.0)
+        self.declare_parameter(
+            "prefer_tyre_3d_in_wait_tire_box",
+            True,
+        )  # WAIT_TIRE_BOX: dispatch nav to /tyre_3d_positions before planned box corners
+        self.declare_parameter(
+            "tyre_3d_prune_planned_radius_m",
+            1.2,
+        )  # remove planned corner near this (x,y) after a successful tyre_3d dispatch (avoids duplicate visits)
+        # Real-motion: visit order around vehicle (FL,FR,RL,RR slots) + optional bridge poses for far-side tyres
+        self.declare_parameter(
+            "tyre_inspection_order_mode",
+            "nearest",
+        )  # nearest | vehicle_side — vehicle_side reorders FL/FR/RL/RR using robot side at commit
+        self.declare_parameter("tyre_perimeter_bridge_enabled", False)  # tyre_3d_direct: insert front/rear bridge if opposite lateral side
+        self.declare_parameter(
+            "vehicle_perimeter_clearance_m",
+            1.0,
+        )  # m expanded half-axes for perimeter polyline (tune 1.0–1.2 for wide clearance)
+        self.declare_parameter("tyre_perimeter_lateral_eps_m", 0.2)  # m: same-side if lateral within this of centerline
+        self.declare_parameter(
+            "costmap_clear_settle_s",
+            1.0,
+        )  # sleep after global/local costmap clear so freespace updates before next goal
+        self.declare_parameter(
+            "use_tyre_geometry",
+            True,
+        )  # infer vehicle axes / visit order from /tyre_3d_positions (stable) vs jittery vehicle box
 
         # Dynamic vehicle detection - vehicles found during mission
         self.detected_vehicles: List[dict] = []  # List of {"box": BoundingBox3d, "position": (x,y,z), "inspected": bool}
@@ -210,7 +284,13 @@ class VehicleInspectionManager(Node):
         self._tire_registry: List[Dict[str, Any]] = []  # {id, vehicle_id, position, visited, image_captured}
         self._tire_id_counter = 0
         self._planned_tire_positions: List[tuple] = []  # planned tire centers for current vehicle
-        
+        self._pending_perimeter_nav_queue: List[PoseStamped] = []  # tyre_3d multi-segment approach (bridge → standoff)
+        self._last_follow_waypoints_pose_count: int = 0
+        self._last_batch_waypoints_perimeter: bool = False
+        self._ordered_tyre_indices: List[int] = []
+        self._tyre_geometry: Optional[TyreBasedVehicleGeometry] = None  # from tyre-only PCA / axle fit
+        self._last_tyre_geometry_pose_count: int = 0
+
         # Recovery state tracking
         self.wait_start_time: Optional[float] = None
         self.rotation_attempts = 0
@@ -428,8 +508,11 @@ class VehicleInspectionManager(Node):
 
         self.nav_client = ActionClient(self, NavigateToPose, "navigate_to_pose")
         use_fw = bool(self.get_parameter("use_follow_waypoints").value)
+        use_batch_wp = bool(self.get_parameter("use_batch_waypoints").value)
         self.follow_waypoints_client = (
-            ActionClient(self, FollowWaypoints, "follow_waypoints") if use_fw else None
+            ActionClient(self, FollowWaypoints, "follow_waypoints")
+            if (use_fw or use_batch_wp)
+            else None
         )
         self._active_follow_waypoints_handle = None
         
@@ -498,6 +581,11 @@ class VehicleInspectionManager(Node):
             lambda msg: self._cmd_vel_cb(msg, self.get_parameter("cmd_vel_nav_topic").value),
             10,
         )
+        self._cmd_vel_pub = self.create_publisher(
+            Twist,
+            self.get_parameter("cmd_vel_topic").value,
+            10,
+        )
         self.create_subscription(
             Bool,
             self.get_parameter("start_mission_topic").value,
@@ -506,6 +594,25 @@ class VehicleInspectionManager(Node):
         )
         self._capture_retry_count = 0
         self._verify_capture_start_time = None
+
+        self._tyre_3d_poses = None
+        self._tyre_3d_stamp = None
+        self.create_subscription(
+            PoseArray,
+            self.get_parameter("tyre_3d_positions_topic").value,
+            self._tyre_3d_cb,
+            10,
+        )
+        demo_nav_topic = str(self.get_parameter("demo_simulate_nav_success_topic").value or "").strip()
+        self._demo_nav_sub = None
+        if demo_nav_topic:
+            self._demo_nav_sub = self.create_subscription(
+                Empty, demo_nav_topic, self._on_demo_simulated_nav_success, 10
+            )
+            self.get_logger().info(
+                f"demo_simulate_nav_success_topic={demo_nav_topic} "
+                "(Empty message → treat as Nav2 arrival in INSPECT_TIRE when demo_mode is true)"
+            )
 
         self.timer = self.create_timer(1.0, self._tick)
         if self.get_parameter("enable_runtime_diagnostics").value:
@@ -534,6 +641,26 @@ class VehicleInspectionManager(Node):
 
     def _health_cb(self, msg: Bool):
         self._sensor_healthy = msg.data
+
+    def _on_demo_simulated_nav_success(self, _msg: Empty) -> None:
+        """Thesis/bench: Empty on demo_simulate_nav_success_topic acts like Nav2 arrival (stub motor never reaches goal)."""
+        if not self._demo_mode_enabled():
+            return
+        if self.current_state != MissionState.INSPECT_TIRE:
+            return
+        if self._active_nav_goal_handle is not None:
+            try:
+                self._active_nav_goal_handle.cancel_goal_async()
+            except Exception as e:
+                self.get_logger().warn(f"demo_simulated_nav: cancel_goal_async failed: {e}")
+            self._active_nav_goal_handle = None
+        self._mission_log_append(
+            "demo_simulated_nav_success",
+            {"state": str(self.current_state)},
+            sync=True,
+        )
+        self.get_logger().info("demo_simulated_nav_success: treating as Nav2 goal reached")
+        self._handle_box_goal_success("demo_simulated_nav_success")
 
     def _validate_startup_config(self) -> None:
         """Hard-fail on unsafe or inconsistent startup configuration."""
@@ -650,14 +777,20 @@ class VehicleInspectionManager(Node):
                 sync=True,
             )
         self.get_logger().info(f"Capture verified: {filename} ({size_bytes} bytes)")
-        if len(self.inspected_tire_positions) >= self.get_parameter("expected_tires_per_vehicle").value:
+        exp = int(self.get_parameter("expected_tires_per_vehicle").value)
+        # Multi-tire flow: until inspected count reaches expected_tires_per_vehicle, return to WAIT_TIRE_BOX for the next planned/tyre_3d goal (pop in tick).
+        if len(self.inspected_tire_positions) >= exp:
             if self._should_retry_deferred_tires():
                 self._requeue_deferred_tires()
+                self._post_capture_backup_sync()
+                self._clear_costmaps()
                 self._set_state(MissionState.WAIT_TIRE_BOX, cause="return_later_requeue")
                 return
             self.get_logger().info(f"Completed inspection of {len(self.inspected_tire_positions)} tires. Moving to next vehicle.")
             self._set_state(MissionState.NEXT_VEHICLE, cause="verify_success")
         else:
+            self._post_capture_backup_sync()
+            self._clear_costmaps()
             self._set_state(MissionState.WAIT_TIRE_BOX, cause="verify_success")
 
     def _finish_verify_capture_failure(self, reason: str):
@@ -704,6 +837,173 @@ class VehicleInspectionManager(Node):
         if isinstance(v, str):
             return v.strip().lower() in ("true", "1", "yes")
         return bool(v)
+
+    def _demo_mode_enabled(self) -> bool:
+        """Thesis / stable_viz: bypass photo distance gates (launch may pass string 'true')."""
+        v = self.get_parameter("demo_mode").value
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, str):
+            return v.strip().lower() in ("true", "1", "yes")
+        return bool(v)
+
+    def _stop_robot(self) -> None:
+        """Publish zero cmd_vel so the base stops if Nav2/controller left a residual command."""
+        try:
+            n = int(self.get_parameter("stop_cmd_vel_repeat").value)
+        except Exception:
+            n = 3
+        n = max(1, min(n, 10))
+        z = Twist()
+        for _ in range(n):
+            self._cmd_vel_pub.publish(z)
+
+    def _open_loop_backup_distance(self, distance_m: float, speed_m: float) -> None:
+        """Timed reverse motion along base_link +x (negative linear.x). Open-loop; no odometry."""
+        if distance_m <= 0 or speed_m <= 0:
+            return
+        duration = distance_m / speed_m
+        t_end = time.time() + duration
+        msg = Twist()
+        msg.linear.x = -abs(speed_m)
+        rate_hz = 20.0
+        dt = 1.0 / rate_hz
+        while time.time() < t_end:
+            self._cmd_vel_pub.publish(msg)
+            time.sleep(dt)
+        self._stop_robot()
+
+    def _robot_cost_from_global_costmap(self) -> Optional[float]:
+        """Footprint cost from global costmap at current map pose, or None if unavailable."""
+        try:
+            from nav2_msgs.srv import GetCosts
+        except Exception:
+            return None
+        pose = self._get_current_pose_in_map_frame()
+        if pose is None:
+            return None
+        map_frame = self.get_parameter("map_frame").value
+        pose.header.frame_id = map_frame
+        pose.header.stamp = self.get_clock().now().to_msg()
+        svc = str(self.get_parameter("robot_pose_costmap_get_cost_service").value)
+
+        def _do_call() -> Optional[float]:
+            cli = self.create_client(GetCosts, svc)
+            if not cli.wait_for_service(timeout_sec=0.5):
+                return None
+            req = GetCosts.Request()
+            req.use_footprint = True
+            req.poses = [pose]
+            resp = cli.call(req)
+            if not resp.success or not resp.costs:
+                return None
+            return float(resp.costs[0])
+
+        try:
+            with ThreadPoolExecutor(max_workers=1) as ex:
+                fut = ex.submit(_do_call)
+                return fut.result(timeout=1.5)
+        except (FuturesTimeoutError, Exception):
+            return None
+
+    def _is_robot_pose_lethal(self) -> Optional[bool]:
+        """True if footprint is in lethal/inscribed band; False if clearly free; None if unknown."""
+        c = self._robot_cost_from_global_costmap()
+        if c is None:
+            return None
+        return c >= COSTMAP_INSCRIBED_INFLATED
+
+    def escape_lethal_start_if_needed(self) -> bool:
+        """Before NavigateToPose: if start pose is lethal on global costmap, back up and retry."""
+        if not bool(self.get_parameter("pre_nav_lethal_escape_enabled").value):
+            return True
+        if self._is_dry_run():
+            return True
+        max_att = int(self.get_parameter("pre_nav_lethal_max_backup_attempts").value)
+        max_att = max(1, min(max_att, 5))
+        dist = float(self.get_parameter("pre_nav_lethal_backup_distance_m").value)
+        speed = float(self.get_parameter("pre_nav_lethal_backup_speed_m").value)
+        settle = float(self.get_parameter("post_capture_costmap_settle_s").value)
+        for attempt in range(max_att):
+            lethal = self._is_robot_pose_lethal()
+            if lethal is False or lethal is None:
+                return True
+            self.get_logger().warn(
+                f"Start pose in lethal global cost; backup attempt {attempt + 1}/{max_att} ({dist:.2f} m)"
+            )
+            self._mission_log_append(
+                "pre_nav_lethal_backup",
+                {"attempt": attempt + 1, "max": max_att, "distance_m": dist},
+                sync=True,
+            )
+            self._stop_robot()
+            self._open_loop_backup_distance(dist, speed)
+            if settle > 0:
+                time.sleep(settle)
+        still = self._is_robot_pose_lethal()
+        if still is True:
+            self.get_logger().error(
+                "Robot still in lethal cost after backup attempts; refusing nav goal."
+            )
+            self._mission_log_append(
+                "pre_nav_lethal_refuse",
+                {"reason": "still_lethal_after_backup"},
+                sync=True,
+            )
+            return False
+        return True
+
+    def _post_capture_backup_sync(self) -> None:
+        """After a successful tyre photo, reverse slightly before the next Nav2 goal (same vehicle)."""
+        if not bool(self.get_parameter("post_capture_backup_enable").value):
+            return
+        if self._is_dry_run():
+            return
+        dist = float(self.get_parameter("post_capture_backup_distance_m").value)
+        speed = float(self.get_parameter("post_capture_backup_speed_m").value)
+        settle = float(self.get_parameter("post_capture_costmap_settle_s").value)
+        if dist <= 0:
+            return
+        self._mission_log_append(
+            "post_capture_backup",
+            {"distance_m": dist, "speed_m": speed},
+            sync=True,
+        )
+        self._stop_robot()
+        self._open_loop_backup_distance(dist, speed)
+        if settle > 0:
+            time.sleep(settle)
+
+    def _clear_costmaps(self) -> None:
+        """Clear global and local costmaps before the next tyre goal (drops stale obstacle marks)."""
+        if self._is_dry_run():
+            return
+        try:
+            if not hasattr(self, "_clear_global_costmap_client"):
+                self._clear_global_costmap_client = self.create_client(
+                    ClearEntireCostmap, "global_costmap/clear_entirely_global_costmap"
+                )
+                self._clear_local_costmap_client = self.create_client(
+                    ClearEntireCostmap, "local_costmap/clear_entirely_local_costmap"
+                )
+            clear_global = self._clear_global_costmap_client
+            clear_local = self._clear_local_costmap_client
+            if not clear_global.wait_for_service(timeout_sec=1.0):
+                self.get_logger().warn("global_costmap clear service not available")
+            if not clear_local.wait_for_service(timeout_sec=1.0):
+                self.get_logger().warn("local_costmap clear service not available")
+            clear_global.call_async(ClearEntireCostmap.Request())
+            clear_local.call_async(ClearEntireCostmap.Request())
+            settle = float(self.get_parameter("costmap_clear_settle_s").value)
+            if settle < 0.0:
+                settle = 0.0
+            time.sleep(settle)
+            self.get_logger().info(
+                f"Cleared global and local costmaps (settle {settle:.2f}s) after tyre capture backup."
+            )
+            self._mission_log_append("costmaps_cleared", {"after": "post_capture_backup"}, sync=True)
+        except Exception as e:
+            self.get_logger().warn(f"Costmap clearing failed: {e}")
 
     def _set_state(self, new_state: str, cause: str = "unknown"):
         """Update internal state, log transition, and publish for debugging."""
@@ -1488,9 +1788,341 @@ class VehicleInspectionManager(Node):
             return False
         return True
 
-    def _dispatch_planned_tire_goal(self, target_pos: tuple) -> tuple:
+    def _tyre_3d_cb(self, msg: PoseArray) -> None:
+        self._tyre_3d_poses = msg.poses
+        self._tyre_3d_stamp = msg.header.stamp
+        self._update_tyre_geometry_from_poses(msg.poses)
+        if msg.poses and bool(self.get_parameter("use_tyre_3d_positions").value):
+            self.get_logger().info(
+                f"/tyre_3d_positions: {len(msg.poses)} pose(s), frame={msg.header.frame_id}",
+                throttle_duration_sec=5.0,
+            )
+
+    def _update_tyre_geometry_from_poses(self, poses) -> None:
+        """Recompute tyre-centric vehicle geometry when new tyre poses arrive."""
+        if not bool(self.get_parameter("use_tyre_geometry").value):
+            self._tyre_geometry = None
+            self._last_tyre_geometry_pose_count = 0
+            return
+        if len(poses) < 2:
+            self._tyre_geometry = None
+            self._last_tyre_geometry_pose_count = len(poses)
+            self.get_logger().debug(
+                f"use_tyre_geometry: need >=2 tyre poses (got {len(poses)}); geometry cleared.",
+                throttle_duration_sec=5.0,
+            )
+            return
+        try:
+            geom = tyre_geometry_from_poses(poses, min_points=2)
+            self._tyre_geometry = geom
+            self._last_tyre_geometry_pose_count = len(poses)
+            self.get_logger().info(
+                f"Tyre geometry: n={len(poses)} center=({geom.mean[0]:.2f},{geom.mean[1]:.2f}) "
+                f"yaw_deg={math.degrees(geom.orientation):.1f} L={geom.length:.2f}m W={geom.width:.2f}m",
+                throttle_duration_sec=4.0,
+            )
+        except Exception as e:
+            self._tyre_geometry = None
+            self.get_logger().warn(f"use_tyre_geometry: failed to compute geometry: {e}")
+
+    def _tyre_3d_stamp_age_s(self) -> Optional[float]:
+        """Seconds since tyre_3d message stamp (0 if stamp is in the future vs ROS time — still treat as fresh)."""
+        if self._tyre_3d_stamp is None:
+            return None
+        try:
+            now = self.get_clock().now()
+            dt = (now - rclpy.time.Time.from_msg(self._tyre_3d_stamp)).nanoseconds / 1e9
+            return max(0.0, dt)
+        except Exception:
+            return None
+
+    def _tyre_3d_fresh(self) -> bool:
+        if not self._tyre_3d_poses:
+            return False
+        if self._tyre_3d_stamp is None:
+            return False
+        try:
+            stale_s = float(self.get_parameter("tyre_3d_stale_s").value)
+            age = self._tyre_3d_stamp_age_s()
+            if age is None:
+                return False
+            return age <= stale_s
+        except Exception:
+            return False
+
+    def _tyre_3d_unavailable_reason(self) -> str:
+        """Human-readable reason `_tyre_3d_pick_nearest_target` would return None (for logging)."""
+        if not self._tyre_3d_poses:
+            return "no_poses"
+        if self._tyre_3d_stamp is None:
+            return "no_header_stamp"
+        stale_s = float(self.get_parameter("tyre_3d_stale_s").value)
+        age = self._tyre_3d_stamp_age_s()
+        if age is None:
+            return "stamp_age_unavailable"
+        if age > stale_s:
+            return f"stale age={age:.2f}s max={stale_s:.2f}s"
+        robot = self._get_current_pose()
+        if robot is None:
+            return "no_robot_tf"
+        rx, ry = robot.pose.position.x, robot.pose.position.y
+        best_d = float("inf")
+        for p in self._tyre_3d_poses:
+            d = math.hypot(p.position.x - rx, p.position.y - ry)
+            if d < best_d:
+                best_d = d
+        if best_d is float("inf"):
+            return "empty_pose_list"
+        min_r = float(self.get_parameter("tyre_3d_min_range_m").value)
+        max_r = float(self.get_parameter("tyre_3d_max_range_m").value)
+        if not (min_r <= best_d <= max_r):
+            return f"nearest_d={best_d:.2f}m outside [{min_r:.2f},{max_r:.2f}]"
+        return "unknown_should_pick"
+
+    def _tyre_3d_pick_nearest_target(self) -> Optional[Tuple[Tuple[float, float, float], float]]:
+        """Return ((x,y,z), distance_m) for nearest tyre in range from fresh /tyre_3d_positions, or None."""
+        if not self._tyre_3d_poses:
+            return None
+        if not self._tyre_3d_fresh():
+            return None
+        robot = self._get_current_pose()
+        if robot is None:
+            return None
+        rx, ry = robot.pose.position.x, robot.pose.position.y
+        best = None
+        best_d = float("inf")
+        for p in self._tyre_3d_poses:
+            px, py = p.position.x, p.position.y
+            d = math.hypot(px - rx, py - ry)
+            if d < best_d:
+                best_d = d
+                best = p
+        if best is None:
+            return None
+        min_r = float(self.get_parameter("tyre_3d_min_range_m").value)
+        max_r = float(self.get_parameter("tyre_3d_max_range_m").value)
+        if not (min_r <= best_d <= max_r):
+            return None
+        target = (best.position.x, best.position.y, best.position.z)
+        return (target, best_d)
+
+    def _prune_planned_tire_near_xy(self, tx: float, ty: float, radius_m: float) -> None:
+        """Remove the planned corner closest to (tx,ty) if within radius_m (after tyre_3d navigation)."""
+        if not self._planned_tire_positions or radius_m <= 0.0:
+            return
+        best_i = None
+        best_d = float("inf")
+        for i, p in enumerate(self._planned_tire_positions):
+            d = math.hypot(p[0] - tx, p[1] - ty)
+            if d < best_d:
+                best_d = d
+                best_i = i
+        if best_i is not None and best_d <= radius_m:
+            removed = self._planned_tire_positions.pop(best_i)
+            if self.current_vehicle_idx < len(self.detected_vehicles):
+                self.detected_vehicles[self.current_vehicle_idx]["planned_tires"] = list(self._planned_tire_positions)
+            self.get_logger().info(
+                f"tyre_3d: pruned planned corner at ({removed[0]:.2f},{removed[1]:.2f}) "
+                f"(d={best_d:.2f}m to tyre_3d) — {len(self._planned_tire_positions)} planned remaining"
+            )
+            self._mission_log_append(
+                "tyre_3d_pruned_planned_corner",
+                {"removed": list(removed)[:3], "distance_m": best_d, "remaining": len(self._planned_tire_positions)},
+                sync=True,
+            )
+
+    def _try_dispatch_from_tyre_3d(self) -> bool:
+        """Navigate to nearest tyre from tyre_3d_projection_node (map/slamware_map poses)."""
+        if not bool(self.get_parameter("use_tyre_3d_positions").value):
+            return False
+        picked = self._tyre_3d_pick_nearest_target()
+        if picked is None:
+            if bool(self.get_parameter("use_tyre_3d_positions").value) and self._tyre_3d_poses and not self._tyre_3d_fresh():
+                self.get_logger().warn(
+                    "/tyre_3d_positions is stale or has no valid stamp; waiting for fresh poses",
+                    throttle_duration_sec=5.0,
+                )
+            elif bool(self.get_parameter("use_tyre_3d_positions").value) and self._tyre_3d_poses:
+                robot = self._get_current_pose()
+                if robot is None:
+                    self.get_logger().warn(
+                        "tyre_3d: robot pose unavailable (TF); cannot compute nav goal",
+                        throttle_duration_sec=5.0,
+                    )
+                else:
+                    # In range filter failed — log occasionally
+                    self.get_logger().info(
+                        "tyre_3d: nearest tyre outside tyre_3d_min/max_range_m — no goal",
+                        throttle_duration_sec=5.0,
+                    )
+            return False
+        target, best_d = picked
+        sent, _ = self._dispatch_planned_tire_goal(target, tyre_3d_direct=True)
+        if not sent:
+            reason = getattr(self, "_last_dispatch_fail_reason", None)
+            self.get_logger().warn(
+                f"tyre_3d: dispatch failed at ({target[0]:.2f},{target[1]:.2f}) dist={best_d:.2f}m "
+                f"(reason={reason})",
+                throttle_duration_sec=3.0,
+            )
+            return False
+        self._set_state(MissionState.INSPECT_TIRE, cause="tyre_3d_direct")
+        self.get_logger().info(
+            f"tyre_3d: navigating to nearest tyre at ({target[0]:.2f},{target[1]:.2f}) dist={best_d:.2f}m"
+        )
+        return True
+
+    def _try_dispatch_tyre_3d_in_wait_tire_box(self) -> bool:
+        """WAIT_TIRE_BOX: prefer fresh /tyre_3d_positions (standoff via tyre_3d_direct) over planned box corners."""
+        if not bool(self.get_parameter("use_tyre_3d_positions").value):
+            return False
+        if not bool(self.get_parameter("prefer_tyre_3d_in_wait_tire_box").value):
+            return False
+        picked = self._tyre_3d_pick_nearest_target()
+        if picked is None:
+            why = self._tyre_3d_unavailable_reason()
+            self.get_logger().info(
+                f"tyre_3d WAIT_TIRE_BOX: skip direct goal ({why}); world_frame={self.get_parameter('world_frame').value}",
+                throttle_duration_sec=2.0,
+            )
+            self._mission_log_append(
+                "tyre_3d_wait_tire_box_skip",
+                {
+                    "reason": why,
+                    "pose_count": len(self._tyre_3d_poses) if self._tyre_3d_poses else 0,
+                    "stamp_age_s": self._tyre_3d_stamp_age_s(),
+                },
+                sync=False,
+            )
+            return False
+        target, best_d = picked
+        tx, ty, tz = target[0], target[1], target[2]
+        robot_pose = self._get_current_pose()
+        robot_pos = (
+            (robot_pose.pose.position.x, robot_pose.pose.position.y, robot_pose.pose.position.z)
+            if robot_pose
+            else None
+        )
+        tire_pos_label = (
+            tire_position_label(target, self._committed_vehicle_center, robot_pos)
+            if self._committed_vehicle_center and robot_pos
+            else "tyre_3d"
+        )
+        self.inspected_tire_positions.append(target)
+        self._tire_id_counter += 1
+        self._tire_registry.append(
+            {
+                "id": self._tire_id_counter,
+                "vehicle_id": self.current_vehicle_idx,
+                "position": target,
+                "tire_position": tire_pos_label or "tyre_3d",
+                "visited": False,
+                "image_captured": False,
+                "goal_source": "tyre_3d_direct",
+            }
+        )
+        self._mission_log_append(
+            "tyre_3d_wait_tire_box_dispatch",
+            {
+                "target": [tx, ty, tz],
+                "distance_m": best_d,
+                "remaining_planned_before": len(self._planned_tire_positions),
+            },
+            sync=True,
+        )
+        sent, _ = self._dispatch_planned_tire_goal(target, tyre_3d_direct=True)
+        if sent:
+            prune_r = float(self.get_parameter("tyre_3d_prune_planned_radius_m").value)
+            self._prune_planned_tire_near_xy(tx, ty, prune_r)
+            self._set_state(MissionState.INSPECT_TIRE, cause="tyre_3d_direct_wait_tire_box")
+            self.get_logger().info(
+                f"tyre_3d (WAIT_TIRE_BOX): nav to standoff near tyre at ({tx:.2f},{ty:.2f}) dist={best_d:.2f}m"
+            )
+            return True
+        self.inspected_tire_positions.pop()
+        self._tire_registry.pop()
+        self._tire_id_counter -= 1
+        reason = getattr(self, "_last_dispatch_fail_reason", None)
+        self.get_logger().warn(
+            f"tyre_3d (WAIT_TIRE_BOX): dispatch failed at ({tx:.2f},{ty:.2f}) (reason={reason}); will retry planned/cached path",
+            throttle_duration_sec=3.0,
+        )
+        return False
+
+    def _maybe_tyre_perimeter_waypoints(self, target_pos: tuple) -> Optional[List[PoseStamped]]:
+        """If tyre_perimeter_bridge_enabled, return 1+ map poses (bridge + standoff).
+
+        Prefers tyre-derived footprint from /tyre_3d_positions when use_tyre_geometry; else Aurora box.
+        """
+        if not bool(self.get_parameter("tyre_perimeter_bridge_enabled").value):
+            return None
+        robot = self._get_current_pose()
+        if robot is None:
+            return None
+        map_frame = self.get_parameter("map_frame").value
+        stamp = self.get_clock().now().to_msg()
+        clearance = float(self.get_parameter("vehicle_perimeter_clearance_m").value)
+        lat_eps = float(self.get_parameter("tyre_perimeter_lateral_eps_m").value)
+        offset_m = float(self._last_tire_offset or self.get_parameter("tire_offset").value)
+
+        if bool(self.get_parameter("use_tyre_geometry").value) and self._tyre_geometry is not None:
+            g = self._tyre_geometry
+            cx, cy = float(g.mean[0]), float(g.mean[1])
+            fwd_x = float(g.longitudinal_axis[0])
+            fwd_y = float(g.longitudinal_axis[1])
+            right_x = float(g.right_axis[0])
+            right_y = float(g.right_axis[1])
+            return build_tyre_approach_waypoints(
+                map_frame,
+                stamp,
+                (robot.pose.position.x, robot.pose.position.y),
+                target_pos,
+                (cx, cy),
+                (fwd_x, fwd_y),
+                (right_x, right_y),
+                float(g.half_length),
+                float(g.half_width),
+                offset_m,
+                clearance,
+                lat_eps,
+            )
+
+        if self._committed_vehicle_box is None:
+            return None
+        fp = get_vehicle_footprint(
+            self._committed_vehicle_box,
+            (robot.pose.position.x, robot.pose.position.y, robot.pose.position.z),
+        )
+        if fp is None:
+            return None
+        cx, cy, L, W, yaw = fp
+        half_len = L * 0.5
+        half_wid = W * 0.5
+        fwd_x = math.cos(yaw)
+        fwd_y = math.sin(yaw)
+        right_x = -fwd_y
+        right_y = fwd_x
+        return build_tyre_approach_waypoints(
+            map_frame,
+            stamp,
+            (robot.pose.position.x, robot.pose.position.y),
+            target_pos,
+            (cx, cy),
+            (fwd_x, fwd_y),
+            (right_x, right_y),
+            half_len,
+            half_wid,
+            offset_m,
+            clearance,
+            lat_eps,
+        )
+
+    def _dispatch_planned_tire_goal(self, target_pos: tuple, tyre_3d_direct: bool = False) -> tuple:
         """Dispatch a goal to a planned tire position. When a wheel detection is near the planned position,
-        use the detection center as the goal (refinement). Returns (sent: bool, used_refined: bool)."""
+        use the detection center as the goal (refinement). Returns (sent: bool, used_refined: bool).
+
+        If tyre_3d_direct is True (goal from tyre_3d_projection_node), standoff uses **robot→tyre** direction so
+        bad 1×1 m vehicle boxes do not skew the goal (vehicle_center offset is skipped)."""
         used_refined = False
         if self.get_parameter("require_nav_permitted").value and self._nav_permitted is not True:
             self._last_dispatch_fail_reason = "nav_permitted_blocked"
@@ -1530,20 +2162,118 @@ class VehicleInspectionManager(Node):
                     sync=True,
                 )
                 return (False, False)
-        # Refine goal from wheel detection when one is within refinement_max_distance_m of planned tire
-        refined = self._refine_target_from_detection(target_pos)
-        if refined is not None:
-            dist_m = math.hypot(refined[0] - target_pos[0], refined[1] - target_pos[1])
-            target_pos = refined
-            used_refined = True
-            self.get_logger().info(
-                f"Refining goal: planned → detection ({dist_m:.2f}m)"
-            )
+        # Refine goal from wheel detection when one is within refinement_max_distance_m of planned tire.
+        # Skip for tyre_3d_direct: goal already comes from /tyre_3d_positions (refinement could snap back toward a bad vehicle box).
+        if not tyre_3d_direct:
+            refined = self._refine_target_from_detection(target_pos)
+            if refined is not None:
+                dist_m = math.hypot(refined[0] - target_pos[0], refined[1] - target_pos[1])
+                target_pos = refined
+                used_refined = True
+                self.get_logger().info(
+                    f"Refining goal: planned → detection ({dist_m:.2f}m)"
+                )
+                self._mission_log_append(
+                    "tire_goal_refined_from_detection",
+                    {"position": list(target_pos), "refinement_max_distance_m": float(self.get_parameter("refinement_max_distance_m").value)},
+                    sync=True,
+                )
+        to = float(self.get_parameter("tire_offset").value)
+        staging = float(self.get_parameter("tire_staging_min_m").value)
+        self._last_tire_offset = max(to, staging) if staging > 0 else to
+
+        # Tyre 3D pose from projection: stand off along (robot - tyre) so we stop in front of the real tyre,
+        # not along (tyre - vehicle_center) which is wrong when the committed box is tiny or mis-sized.
+        if tyre_3d_direct:
+            robot = self._get_current_pose()
+            if robot is None:
+                self.get_logger().warn("tyre_3d_direct: robot pose unavailable; cannot compute standoff goal.")
+                self._last_dispatch_fail_reason = "no_robot_pose_tyre_3d"
+                return (False, used_refined)
+            self._pending_perimeter_nav_queue.clear()
+            rx, ry = robot.pose.position.x, robot.pose.position.y
+            tx, ty, tz = target_pos[0], target_pos[1], target_pos[2]
+            offset_m = self._last_tire_offset
+            map_frame = self.get_parameter("map_frame").value
+            stamp = self.get_clock().now().to_msg()
+            perimeter_wp = self._maybe_tyre_perimeter_waypoints(target_pos)
+            if perimeter_wp is not None and perimeter_wp:
+                waypoints_to_send = perimeter_wp
+            else:
+                gx, gy, heading, d = standoff_goal_robot_tyre_xy(rx, ry, tx, ty, offset_m)
+                waypoints_to_send = [
+                    pose_stamped_from_standoff_xy(map_frame, stamp, gx, gy, tz, heading)
+                ]
+            goal = waypoints_to_send[0]
+            gx = goal.pose.position.x
+            gy = goal.pose.position.y
+            heading = yaw_from_quaternion(goal.pose.orientation)
+            d = math.hypot(rx - tx, ry - ty)
+            if len(waypoints_to_send) > 1:
+                self._pending_perimeter_nav_queue = list(waypoints_to_send[1:])
+                self._mission_log_append(
+                    "tyre_perimeter_waypoints",
+                    {
+                        "segments": len(waypoints_to_send),
+                        "queued": len(self._pending_perimeter_nav_queue),
+                    },
+                    sync=True,
+                )
+            if not (math.isfinite(gx) and math.isfinite(gy)):
+                self._last_dispatch_fail_reason = "goal_position_not_finite"
+                return (False, used_refined)
             self._mission_log_append(
-                "tire_goal_refined_from_detection",
-                {"position": list(target_pos), "refinement_max_distance_m": float(self.get_parameter("refinement_max_distance_m").value)},
+                "goal_computed",
+                {
+                    "frame": map_frame,
+                    "x": gx,
+                    "y": gy,
+                    "z": tz,
+                    "yaw_deg": math.degrees(heading),
+                    "offset": offset_m,
+                    "distance_to_object": d,
+                    "state": self.current_state,
+                    "transform_ok": True,
+                    "world_frame": map_frame,
+                    "tyre_3d_robot_standoff": True,
+                    "used_refined": used_refined,
+                    "goal_world": {"x": gx, "y": gy, "z": tz},
+                    "perimeter_segments": len(waypoints_to_send),
+                },
                 sync=True,
             )
+            self._current_goal_pose = goal
+            self.current_goal_pub.publish(goal)
+            if self._is_dry_run():
+                self.get_logger().info("Dry run: tyre_3d standoff goal validated, not sending to Nav2")
+                self._last_dispatch_fail_reason = None
+                return (True, used_refined)
+            ok = send_nav_goal(self, goal, self._on_box_goal_done, feedback_cb=self._on_nav_feedback)
+            if ok:
+                self._mission_log_append(
+                    "nav_command_sent",
+                    {
+                        "frame": map_frame,
+                        "x": gx,
+                        "y": gy,
+                        "z": tz,
+                        "yaw_deg": math.degrees(heading),
+                        "state": self.current_state,
+                        "tyre_3d_robot_standoff": True,
+                        "perimeter_segments": len(waypoints_to_send),
+                    },
+                    sync=True,
+                )
+                self.get_logger().info(
+                    f"NAV_COMMAND_SENT (tyre_3d robot standoff): pos=({gx:.3f},{gy:.3f},{tz:.3f}) "
+                    f"yaw_deg={math.degrees(heading):.1f} segments={len(waypoints_to_send)}"
+                )
+            else:
+                self._last_dispatch_fail_reason = "nav_send_failed"
+                self._dispatch_fail_count += 1
+                self._pending_perimeter_nav_queue.clear()
+            return (ok, used_refined)
+
         extent = float(self.get_parameter("planned_tire_box_extent_m").value)
         tire_label = self.get_parameter("tire_label").value
         box = BoundingBox3d()
@@ -1556,9 +2286,6 @@ class VehicleInspectionManager(Node):
         box.zmin = target_pos[2] - extent
         box.zmax = target_pos[2] + extent
         self._last_tire_box = box
-        to = float(self.get_parameter("tire_offset").value)
-        staging = float(self.get_parameter("tire_staging_min_m").value)
-        self._last_tire_offset = max(to, staging) if staging > 0 else to
         self._mission_log_append(
             "tire_planned_fallback",
             {"position": target_pos, "extent": extent},
@@ -1587,23 +2314,14 @@ class VehicleInspectionManager(Node):
             vcx = float(anchor["x"])
             vcy = float(anchor["y"])
             tx, ty, tz = target_pos[0], target_pos[1], target_pos[2]
-            dx = tx - vcx
-            dy = ty - vcy
-            d = math.sqrt(dx * dx + dy * dy)
-            if d >= 0.05:
-                offset_m = self._last_tire_offset
-                gx = tx + offset_m * dx / d
-                gy = ty + offset_m * dy / d
-                heading = math.atan2(ty - gy, tx - gx)
+            offset_m = self._last_tire_offset
+            out = standoff_goal_vehicle_center_tire_xy(vcx, vcy, tx, ty, offset_m)
+            if out is not None:
+                gx, gy, heading, d = out
                 map_frame = self.get_parameter("map_frame").value
-                goal = PoseStamped()
-                goal.header = Header()
-                goal.header.frame_id = map_frame
-                goal.header.stamp = self.get_clock().now().to_msg()
-                goal.pose.position.x = gx
-                goal.pose.position.y = gy
-                goal.pose.position.z = tz
-                goal.pose.orientation = quaternion_from_yaw(heading)
+                goal = pose_stamped_from_standoff_xy(
+                    map_frame, self.get_clock().now().to_msg(), gx, gy, tz, heading
+                )
                 if not (math.isfinite(gx) and math.isfinite(gy)):
                     self._last_dispatch_fail_reason = "goal_position_not_finite"
                     self._dispatch_fail_count += 1
@@ -1688,24 +2406,221 @@ class VehicleInspectionManager(Node):
             if len(target_pos) != 3 or not all(math.isfinite(x) for x in target_pos):
                 continue
             tx, ty, tz = target_pos[0], target_pos[1], target_pos[2]
-            dx, dy = tx - vcx, ty - vcy
-            d = math.sqrt(dx * dx + dy * dy)
-            if d < 0.05:
+            out = standoff_goal_vehicle_center_tire_xy(vcx, vcy, tx, ty, offset_m)
+            if out is None:
                 continue
-            gx = tx + offset_m * dx / d
-            gy = ty + offset_m * dy / d
-            heading = math.atan2(ty - gy, tx - gx)
-            goal = PoseStamped()
-            goal.header = Header()
-            goal.header.frame_id = map_frame
-            goal.header.stamp = self.get_clock().now().to_msg()
-            goal.pose.position.x = gx
-            goal.pose.position.y = gy
-            goal.pose.position.z = tz
-            goal.pose.orientation = quaternion_from_yaw(heading)
+            gx, gy, heading, _d = out
+            goal = pose_stamped_from_standoff_xy(
+                map_frame, self.get_clock().now().to_msg(), gx, gy, tz, heading
+            )
             if math.isfinite(gx) and math.isfinite(gy):
                 poses.append(goal)
         return poses
+
+    def _transform_pose_to_target_frame(
+        self, pose_stamped: PoseStamped, target_frame: str
+    ) -> Optional[PoseStamped]:
+        """Transform a PoseStamped into ``target_frame`` (e.g. Nav2 ``map``). Returns None on TF failure."""
+        return tf_transform_pose(
+            self.tf_buffer,
+            pose_stamped,
+            target_frame,
+            timeout_s=2.0,
+            logger=self.get_logger(),
+        )
+
+    def _cancel_active_navigation_if_any(self) -> None:
+        """Cancel NavigateToPose / FollowWaypoints before sending a new navigation command."""
+        h = getattr(self, "_active_nav_goal_handle", None)
+        if h is not None:
+            try:
+                h.cancel_goal_async()
+            except Exception as e:
+                self.get_logger().warn(f"cancel_active_navigation: nav goal cancel failed: {e}")
+            self._active_nav_goal_handle = None
+        fh = getattr(self, "_active_follow_waypoints_handle", None)
+        if fh is not None:
+            try:
+                if hasattr(fh, "cancel_goal_async"):
+                    fh.cancel_goal_async()
+            except Exception as e:
+                self.get_logger().warn(f"cancel_active_navigation: follow_waypoints cancel failed: {e}")
+            self._active_follow_waypoints_handle = None
+
+    def _vehicle_geometry_for_batch_waypoints_in_map(self) -> Optional[Dict[str, Any]]:
+        """Return vehicle center, axes, half-extents in ``map`` frame for ``build_tyre_approach_waypoints``."""
+        world_frame = self.get_parameter("world_frame").value
+        map_frame = self.get_parameter("map_frame").value
+        robot_w = self._get_current_pose()
+        if robot_w is None:
+            return None
+
+        def _norm_xy(x: float, y: float) -> Tuple[float, float]:
+            n = math.hypot(x, y)
+            if n < 1e-9:
+                return (1.0, 0.0)
+            return (x / n, y / n)
+
+        if bool(self.get_parameter("use_tyre_geometry").value) and self._tyre_geometry is not None:
+            g = self._tyre_geometry
+            cx, cy = float(g.mean[0]), float(g.mean[1])
+            ps = PoseStamped()
+            ps.header.frame_id = world_frame
+            ps.header.stamp = self.get_clock().now().to_msg()
+            ps.pose.position.x = cx
+            ps.pose.position.y = cy
+            ps.pose.position.z = 0.0
+            ps.pose.orientation.w = 1.0
+            pc = tf_transform_pose(
+                self.tf_buffer, ps, map_frame, timeout_s=2.0, logger=self.get_logger()
+            )
+            if pc is None:
+                return None
+            fx, fy = float(g.longitudinal_axis[0]), float(g.longitudinal_axis[1])
+            rx, ry = float(g.right_axis[0]), float(g.right_axis[1])
+            fwd_m = tf_transform_vector_xy(
+                self.tf_buffer, fx, fy, world_frame, map_frame, logger=self.get_logger()
+            )
+            right_m = tf_transform_vector_xy(
+                self.tf_buffer, rx, ry, world_frame, map_frame, logger=self.get_logger()
+            )
+            if fwd_m is None or right_m is None:
+                return None
+            fwd_m = _norm_xy(fwd_m[0], fwd_m[1])
+            right_m = _norm_xy(right_m[0], right_m[1])
+            return {
+                "center_xy": (float(pc.pose.position.x), float(pc.pose.position.y)),
+                "fwd_xy": fwd_m,
+                "right_xy": right_m,
+                "half_length_m": float(g.half_length),
+                "half_width_m": float(g.half_width),
+            }
+
+        if self._committed_vehicle_box is None:
+            return None
+        fp = get_vehicle_footprint(
+            self._committed_vehicle_box,
+            (robot_w.pose.position.x, robot_w.pose.position.y, robot_w.pose.position.z),
+        )
+        if fp is None:
+            return None
+        cx, cy, L, W, yaw = fp
+        fw, fyaw = math.cos(yaw), math.sin(yaw)
+        rw, rry = -fyaw, fw
+        ps = PoseStamped()
+        ps.header.frame_id = world_frame
+        ps.header.stamp = self.get_clock().now().to_msg()
+        ps.pose.position.x = float(cx)
+        ps.pose.position.y = float(cy)
+        ps.pose.position.z = 0.0
+        ps.pose.orientation.w = 1.0
+        pc = tf_transform_pose(
+            self.tf_buffer, ps, map_frame, timeout_s=2.0, logger=self.get_logger()
+        )
+        if pc is None:
+            return None
+        fwd_m = tf_transform_vector_xy(
+            self.tf_buffer, fw, fyaw, world_frame, map_frame, logger=self.get_logger()
+        )
+        right_m = tf_transform_vector_xy(
+            self.tf_buffer, rw, rry, world_frame, map_frame, logger=self.get_logger()
+        )
+        if fwd_m is None or right_m is None:
+            return None
+        fwd_m = _norm_xy(fwd_m[0], fwd_m[1])
+        right_m = _norm_xy(right_m[0], right_m[1])
+        half_len = max(float(L) * 0.5, 0.1)
+        half_wid = max(float(W) * 0.5, 0.1)
+        return {
+            "center_xy": (float(pc.pose.position.x), float(pc.pose.position.y)),
+            "fwd_xy": fwd_m,
+            "right_xy": right_m,
+            "half_length_m": half_len,
+            "half_width_m": half_wid,
+        }
+
+    def _build_full_waypoint_list(self) -> List[PoseStamped]:
+        """Ordered Nav2 waypoints in ``map`` frame: optional perimeter polyline + standoff per planned tyre."""
+        out: List[PoseStamped] = []
+        if not self._planned_tire_positions:
+            return out
+        map_frame = self.get_parameter("map_frame").value
+        world_frame = self.get_parameter("world_frame").value
+        robot_pose_map = self._get_current_pose_in_map_frame()
+        if robot_pose_map is None:
+            self.get_logger().warn("batch waypoints: robot pose in map frame unavailable")
+            return out
+        geom = self._vehicle_geometry_for_batch_waypoints_in_map()
+        if geom is None:
+            self.get_logger().warn(
+                "batch waypoints: vehicle geometry in map unavailable "
+                "(need use_tyre_geometry + tyre poses, or a valid committed vehicle box)"
+            )
+            return out
+
+        to = float(self.get_parameter("tire_offset").value)
+        staging = float(self.get_parameter("tire_staging_min_m").value)
+        standoff_m = max(to, staging if staging > 0 else 0.0)
+        clearance = float(self.get_parameter("vehicle_perimeter_clearance_m").value)
+        lat_eps = float(self.get_parameter("tyre_perimeter_lateral_eps_m").value)
+        bridge = bool(self.get_parameter("tyre_perimeter_bridge_enabled").value)
+        expected = int(self.get_parameter("expected_tires_per_vehicle").value)
+        positions = list(self._planned_tire_positions)
+        if expected >= 1 and len(positions) > expected:
+            positions = positions[:expected]
+
+        rx_m = float(robot_pose_map.pose.position.x)
+        ry_m = float(robot_pose_map.pose.position.y)
+        stamp = self.get_clock().now().to_msg()
+
+        for target_xyz in positions:
+            if len(target_xyz) != 3 or not all(math.isfinite(float(x)) for x in target_xyz):
+                continue
+            tx, ty, tz = float(target_xyz[0]), float(target_xyz[1]), float(target_xyz[2])
+            ps = PoseStamped()
+            ps.header.frame_id = world_frame
+            ps.header.stamp = stamp
+            ps.pose.position.x = tx
+            ps.pose.position.y = ty
+            ps.pose.position.z = tz
+            ps.pose.orientation.w = 1.0
+            tyre_map = self._transform_pose_to_target_frame(ps, map_frame)
+            if tyre_map is None:
+                self.get_logger().warn(
+                    f"batch waypoints: skip tyre at ({tx:.2f},{ty:.2f}) — TF to {map_frame} failed"
+                )
+                continue
+            tmx = float(tyre_map.pose.position.x)
+            tmy = float(tyre_map.pose.position.y)
+            tmz = float(tyre_map.pose.position.z)
+
+            if bridge:
+                segment = build_tyre_approach_waypoints(
+                    map_frame,
+                    stamp,
+                    (rx_m, ry_m),
+                    (tmx, tmy, tmz),
+                    geom["center_xy"],
+                    geom["fwd_xy"],
+                    geom["right_xy"],
+                    geom["half_length_m"],
+                    geom["half_width_m"],
+                    standoff_m,
+                    clearance,
+                    lat_eps,
+                )
+            else:
+                gx, gy, heading, _ = standoff_goal_robot_tyre_xy(rx_m, ry_m, tmx, tmy, standoff_m)
+                segment = [
+                    pose_stamped_from_standoff_xy(map_frame, stamp, gx, gy, tmz, heading)
+                ]
+            if not segment:
+                continue
+            out.extend(segment)
+            rx_m = float(segment[-1].pose.position.x)
+            ry_m = float(segment[-1].pose.position.y)
+
+        return out
 
     def _sync_planned_tires_for_current_vehicle(self) -> None:
         """Load planned tires from current vehicle data into active list."""
@@ -1764,6 +2679,7 @@ class VehicleInspectionManager(Node):
         self._committed_vehicle_planned_tires = None
         self._committed_vehicle_anchor_pose = None
         self._committed_vehicle_id = None
+        self._pending_perimeter_nav_queue.clear()
 
     def _commit_current_vehicle(self) -> bool:
         """Lock in vehicle position and tire plan from detected_vehicles[current_vehicle_idx].
@@ -1808,6 +2724,68 @@ class VehicleInspectionManager(Node):
                 rx, ry = robot_pose.pose.position.x, robot_pose.pose.position.y
                 self._planned_tire_positions.sort(key=lambda t: math.hypot(t[0] - rx, t[1] - ry))
                 self._planned_tire_positions = self._planned_tire_positions[:1]
+        else:
+            mode = str(self.get_parameter("tyre_inspection_order_mode").value).strip().lower()
+            if mode == "vehicle_side" and len(self._committed_vehicle_planned_tires) == 4:
+                robot_pose = self._get_current_pose()
+                if robot_pose is not None:
+                    rx = robot_pose.pose.position.x
+                    ry = robot_pose.pose.position.y
+                    ordered_from_tyres = False
+                    if (
+                        bool(self.get_parameter("use_tyre_geometry").value)
+                        and self._tyre_3d_poses
+                        and len(self._tyre_3d_poses) == 4
+                    ):
+                        try:
+                            geom = tyre_geometry_from_poses(self._tyre_3d_poses, min_points=4)
+                            if geom is not None:
+                                idx_order = geom.visit_order_pose_indices(rx, ry)
+                                self._planned_tire_positions = []
+                                for j in idx_order:
+                                    pos = self._tyre_3d_poses[j].position
+                                    self._planned_tire_positions.append(
+                                        (float(pos.x), float(pos.y), float(pos.z))
+                                    )
+                                ordered_from_tyres = True
+                                self.get_logger().info(
+                                    f"tyre_inspection_order_mode=vehicle_side: visit order from tyre geometry "
+                                    f"(pose_indices={idx_order})"
+                                )
+                                self._mission_log_append(
+                                    "tyre_visit_order_tyre_geometry",
+                                    {"pose_indices": list(idx_order)},
+                                    sync=True,
+                                )
+                        except Exception as ex:
+                            self.get_logger().warn(
+                                f"tyre geometry visit order failed ({ex}); falling back to vehicle box footprint."
+                            )
+                    if not ordered_from_tyres and self._committed_vehicle_box is not None:
+                        fp = get_vehicle_footprint(
+                            self._committed_vehicle_box,
+                            (rx, ry, robot_pose.pose.position.z),
+                        )
+                        if fp is not None:
+                            cx, cy, _L, _W, yaw = fp
+                            fwd_x = math.cos(yaw)
+                            fwd_y = math.sin(yaw)
+                            right_x = -fwd_y
+                            right_y = fwd_x
+                            lon, lat = robot_lon_lat((rx, ry), (cx, cy), (fwd_x, fwd_y), (right_x, right_y))
+                            side = classify_robot_side(lon, lat)
+                            order = inspection_order_indices(side)
+                            committed = [tuple(p) for p in self._committed_vehicle_planned_tires]
+                            self._planned_tire_positions = [committed[i] for i in order]
+                            self.get_logger().info(
+                                f"tyre_inspection_order_mode=vehicle_side (box): slot visit order {order} "
+                                f"(robot side={side.name})"
+                            )
+                            self._mission_log_append(
+                                "tyre_visit_order_vehicle_side",
+                                {"robot_side": side.name, "slot_order": list(order)},
+                                sync=True,
+                            )
         if self.current_vehicle_idx < len(self.detected_vehicles):
             self.detected_vehicles[self.current_vehicle_idx]["planned_tires"] = list(self._planned_tire_positions)
         self._mission_log_append(
@@ -1826,6 +2804,7 @@ class VehicleInspectionManager(Node):
             f"Committed vehicle {self._committed_vehicle_id}: center={self._committed_vehicle_center}, "
             f"{n_tires} tire(s) in plan; all goals will use this plan."
         )
+        self._ordered_tyre_indices = list(range(len(self._planned_tire_positions)))
         return True
 
     def _save_vehicle_position(self, box: BoundingBox3d):
@@ -2343,10 +3322,10 @@ class VehicleInspectionManager(Node):
                     self.get_logger().info("Nav2 navigate_to_pose available. Starting mission.")
                 self._nav2_wait_start_time = None
                 self._nav2_wait_last_log_elapsed = 0.0
-                # When use_follow_waypoints: also wait for follow_waypoints action server (determinism 6.2)
+                # When use_follow_waypoints / use_batch_waypoints: also wait for follow_waypoints action server
                 if self.follow_waypoints_client and not self.follow_waypoints_client.wait_for_server(timeout_sec=5.0):
                     self.get_logger().warn(
-                        "FollowWaypoints action server not available; use_follow_waypoints=True but server missing. "
+                        "FollowWaypoints action server not available; use_follow_waypoints/use_batch_waypoints set but server missing. "
                         "Will fall back to sequential navigate_to_pose if batch path not taken."
                     )
             # Require TF (slamware_map->base_link) valid and stable before starting so we don't enter SEARCH_VEHICLE then immediately pause
@@ -2571,6 +3550,9 @@ class VehicleInspectionManager(Node):
             return
 
         if self.current_state == MissionState.SEARCH_VEHICLE:
+            if bool(self.get_parameter("use_tyre_3d_positions").value):
+                if self._try_dispatch_from_tyre_3d():
+                    return
             # In dynamic mode, wait for vehicle detection to populate detected_vehicles list
             # Once we have vehicles, move to first vehicle
             if len(self.detected_vehicles) > 0:
@@ -2658,6 +3640,9 @@ class VehicleInspectionManager(Node):
             return  # waiting on patrol nav to complete
 
         if self.current_state == MissionState.WAIT_VEHICLE_BOX:
+            if bool(self.get_parameter("use_tyre_3d_positions").value):
+                if self._try_dispatch_from_tyre_3d():
+                    return
             # Use committed vehicle plan only: no live box jitter. Commit once per vehicle.
             if not self._dispatched_approach_this_wait and self.current_vehicle_box is not None:
                 if self._committed_vehicle_box is None:
@@ -2690,17 +3675,58 @@ class VehicleInspectionManager(Node):
                             if self.current_vehicle_idx < len(self.detected_vehicles):
                                 self.detected_vehicles[self.current_vehicle_idx]["planned_tires"] = list(self._planned_tire_positions)
                     if self._planned_tire_positions:
-                        # Sort by distance to robot (nearest corner first)
+                        # Sort by distance to robot (nearest corner first) unless batch waypoints (fixed inspection order)
                         robot_pose = self._get_current_pose()
-                        if robot_pose:
+                        if robot_pose and not bool(
+                            self.get_parameter("use_batch_waypoints").value
+                        ):
                             rx, ry = robot_pose.pose.position.x, robot_pose.pose.position.y
                             self._planned_tire_positions.sort(
                                 key=lambda t: math.hypot(t[0] - rx, t[1] - ry)
                             )
-                        # FollowWaypoints batch: send all 4 tire poses at once (requires PhotoAtWaypoint)
+                        use_batch = bool(self.get_parameter("use_batch_waypoints").value)
+                        use_fw = bool(self.get_parameter("use_follow_waypoints").value)
+                        expected_tires = int(self.get_parameter("expected_tires_per_vehicle").value)
+                        n_plan = len(self._planned_tire_positions)
+                        # Full approach list in map frame (perimeter + standoff per tyre)
+                        if use_batch and n_plan >= 1 and expected_tires >= 1:
+                            self._cancel_active_navigation_if_any()
+                            poses = self._build_full_waypoint_list()
+                            if poses:
+                                self._last_follow_waypoints_pose_count = len(poses)
+                                self._last_batch_waypoints_perimeter = bool(
+                                    self.get_parameter("tyre_perimeter_bridge_enabled").value
+                                )
+                                if send_follow_waypoints(self, poses, self._on_follow_waypoints_done):
+                                    self._dispatched_approach_this_wait = True
+                                    if self._wait_context:
+                                        self._wait_context.dispatch_retry_count = 0
+                                    self.get_logger().info(
+                                        f"FollowWaypoints batch (full list): sent {len(poses)} poses in map frame."
+                                    )
+                                    self._mission_log_append(
+                                        "follow_waypoints_batch_dispatched",
+                                        {
+                                            "poses_count": len(poses),
+                                            "vehicle_id": self._committed_vehicle_id,
+                                            "mode": "use_batch_waypoints",
+                                        },
+                                        sync=True,
+                                    )
+                                    self._set_state(
+                                        MissionState.FOLLOW_WAYPOINTS_BATCH,
+                                        cause="batch_follow_waypoints",
+                                    )
+                                    return
+                            self.get_logger().warn(
+                                "use_batch_waypoints: empty waypoint list; falling back to sequential nav."
+                            )
+                        # Legacy batch: four standoff poses only (no perimeter polyline)
                         if (
-                            bool(self.get_parameter("use_follow_waypoints").value)
-                            and len(self._planned_tire_positions) >= 4
+                            use_fw
+                            and not use_batch
+                            and n_plan >= 4
+                            and expected_tires >= 4
                         ):
                             poses = self._build_planned_tire_poses(
                                 self._planned_tire_positions[:4]
@@ -2708,11 +3734,13 @@ class VehicleInspectionManager(Node):
                             if poses and send_follow_waypoints(
                                 self, poses, self._on_follow_waypoints_done
                             ):
+                                self._last_follow_waypoints_pose_count = len(poses)
+                                self._last_batch_waypoints_perimeter = False
                                 self._dispatched_approach_this_wait = True
                                 if self._wait_context:
                                     self._wait_context.dispatch_retry_count = 0
                                 self.get_logger().info(
-                                    "FollowWaypoints batch: sent 4 tire poses (PhotoAtWaypoint captures at each)."
+                                    "FollowWaypoints batch: sent 4 tire standoff poses (waypoint task plugin captures at each)."
                                 )
                                 self._mission_log_append(
                                     "follow_waypoints_batch_dispatched",
@@ -2944,6 +3972,12 @@ class VehicleInspectionManager(Node):
                 else:
                     self._trigger_tire_capture()
                 return
+            # Prefer fresh /tyre_3d_positions over planned 1×1 m vehicle corners (avoids goals inside inflated vehicle cells).
+            if bool(self.get_parameter("use_tyre_3d_positions").value) and bool(
+                self.get_parameter("prefer_tyre_3d_in_wait_tire_box").value
+            ):
+                if self._try_dispatch_tyre_3d_in_wait_tire_box():
+                    return
             # Re-publish segmentation mode periodically so ultralytics_node receives "inspection"
             # even if it started after we entered WAIT_TIRE_BOX (avoids "Waiting for subscriber")
             now = time.time()
@@ -4328,6 +5362,7 @@ class VehicleInspectionManager(Node):
         goal_handle = future.result()
         if not goal_handle.accepted:
             self.get_logger().error("Standoff goal rejected.")
+            self._stop_robot()
             self._mission_log_append(
                 "nav_rejected",
                 {"goal": "standoff", "reason": "goal_handle.accepted=False"},
@@ -4351,6 +5386,7 @@ class VehicleInspectionManager(Node):
         self._active_follow_waypoints_handle = goal_handle if goal_handle.accepted else None
         if not goal_handle.accepted:
             self.get_logger().error("FollowWaypoints goal rejected.")
+            self._stop_robot()
             self._mission_log_append(
                 "follow_waypoints_rejected",
                 {"state": self.current_state},
@@ -4366,9 +5402,13 @@ class VehicleInspectionManager(Node):
         self._active_follow_waypoints_handle = None
         result = future.result().result
         missed = list(result.missed_waypoints) if result else []
-        succeeded = 4 - len(missed)
+        n_poses = int(getattr(self, "_last_follow_waypoints_pose_count", 0) or 0)
+        if n_poses <= 0:
+            n_poses = 4
+        succeeded = max(0, n_poses - len(missed))
         self._total_tires_captured += succeeded
         planned = self._committed_vehicle_planned_tires or []
+        use_perimeter = bool(getattr(self, "_last_batch_waypoints_perimeter", False))
         for idx in missed:
             tire_label = f"waypoint_{idx}"
             self._tires_skipped.append({
@@ -4376,7 +5416,11 @@ class VehicleInspectionManager(Node):
                 "reason": "unreachable",
                 "tire_position": tire_label,
             })
-            if 0 <= int(idx) < len(planned):
+            if (
+                not use_perimeter
+                and planned
+                and 0 <= int(idx) < len(planned)
+            ):
                 self._add_tire_to_deferred(planned[int(idx)], tire_label)
         self._mission_report["tires_skipped"] = list(self._tires_skipped)
         self.get_logger().info(
@@ -4384,7 +5428,12 @@ class VehicleInspectionManager(Node):
         )
         self._mission_log_append(
             "follow_waypoints_result",
-            {"succeeded": succeeded, "missed_waypoints": missed},
+            {
+                "succeeded": succeeded,
+                "missed_waypoints": missed,
+                "total_poses": n_poses,
+                "perimeter_batch": use_perimeter,
+            },
             sync=True,
         )
         self._planned_tire_positions = []
@@ -4403,6 +5452,7 @@ class VehicleInspectionManager(Node):
         goal_handle = future.result()
         if not goal_handle.accepted:
             self.get_logger().error("Box goal rejected by Nav2; returning to WAIT so we can retry.")
+            self._stop_robot()
             self._mission_log_append(
                 "nav_rejected",
                 {"goal": "box", "state": self.current_state},
@@ -4538,6 +5588,8 @@ class VehicleInspectionManager(Node):
         )
 
         if not nav_succeeded:
+            self._stop_robot()
+            self._mission_log_append("nav_failure_stop_cmd_vel", {"status": int(status)}, sync=True)
             self._nav_retry_count += 1
             budget = self.get_parameter("nav_retry_budget").value
             self._progress_stall_count += 1
@@ -4569,6 +5621,7 @@ class VehicleInspectionManager(Node):
                 self._set_state(MissionState.WAIT_VEHICLE_BOX, cause="nav_failed_approach")
                 return
             if self.current_state == MissionState.INSPECT_TIRE:
+                self._pending_perimeter_nav_queue.clear()
                 skip_on_fail = bool(self.get_parameter("skip_tire_on_nav_failure").value)
                 if skip_on_fail:
                     # Skip unreachable tire immediately (research: stop_on_failure: false; determinism 1.3)
@@ -4688,6 +5741,24 @@ class VehicleInspectionManager(Node):
                 self._current_goal_pose = None
                 self._set_state(MissionState.WAIT_TIRE_BOX, cause="nav_failed_tire")
                 return
+
+        if (
+            nav_succeeded
+            and self.current_state == MissionState.INSPECT_TIRE
+            and self._pending_perimeter_nav_queue
+        ):
+            next_pose = self._pending_perimeter_nav_queue.pop(0)
+            self._mission_log_append(
+                "perimeter_nav_segment",
+                {"remaining": len(self._pending_perimeter_nav_queue)},
+                sync=True,
+            )
+            if send_nav_goal(self, next_pose, self._on_box_goal_done, feedback_cb=self._on_nav_feedback):
+                self._current_goal_pose = next_pose
+                self.current_goal_pub.publish(next_pose)
+                return
+            self._pending_perimeter_nav_queue.clear()
+            self.get_logger().warn("perimeter_nav: failed to send next segment; completing tire arrival.")
 
         if self.current_state == MissionState.APPROACH_VEHICLE:
             self._handle_box_goal_success("nav_arrived_vehicle")
@@ -4813,83 +5884,98 @@ class VehicleInspectionManager(Node):
             dist_rem = getattr(self._last_nav_feedback, "distance_remaining", None)
             if dist_rem is not None:
                 distance_to_goal = dist_rem
+        demo = self._demo_mode_enabled()
         self._mission_log_append(
             "photo_trigger_distance_check",
             {
                 "distance_to_goal": distance_to_goal,
                 "threshold": trigger_threshold,
                 "state": self.current_state,
+                "demo_mode": demo,
             },
             sync=True,
         )
-        if not should_trigger_photo(distance_to_goal, trigger_threshold):
-            self.get_logger().error(
-                f"Photo trigger blocked: distance_to_goal={distance_to_goal} > threshold={trigger_threshold}"
+        if not demo:
+            if not should_trigger_photo(distance_to_goal, trigger_threshold):
+                self.get_logger().error(
+                    f"Photo trigger blocked: distance_to_goal={distance_to_goal} > threshold={trigger_threshold}"
+                )
+                self._mission_log_append(
+                    "photo_trigger_blocked",
+                    {
+                        "distance_to_goal": distance_to_goal,
+                        "threshold": trigger_threshold,
+                        "state": self.current_state,
+                    },
+                    sync=True,
+                )
+                self._set_state(MissionState.WAIT_TIRE_BOX, cause="photo_trigger_distance")
+                return
+            # Optional: require close to tire center (avoids capturing when goal was wrong or we never reached tire)
+            max_to_tire = float(self.get_parameter("capture_max_distance_to_tire_m").value)
+            if max_to_tire > 0 and self._last_tire_box is not None:
+                pose_map = self._get_current_pose_in_map_frame()
+                if pose_map is not None:
+                    cx = (self._last_tire_box.xmin + self._last_tire_box.xmax) / 2.0
+                    cy = (self._last_tire_box.ymin + self._last_tire_box.ymax) / 2.0
+                    dx = pose_map.pose.position.x - cx
+                    dy = pose_map.pose.position.y - cy
+                    dist_to_tire = math.sqrt(dx * dx + dy * dy)
+                    if dist_to_tire > max_to_tire:
+                        self.get_logger().error(
+                            f"Photo trigger blocked: distance_to_tire={dist_to_tire:.2f}m > max={max_to_tire}m (not at tire)"
+                        )
+                        self._mission_log_append(
+                            "photo_trigger_blocked",
+                            {
+                                "distance_to_tire": round(dist_to_tire, 3),
+                                "max_distance_to_tire_m": max_to_tire,
+                                "state": self.current_state,
+                            },
+                            sync=True,
+                        )
+                        self._set_state(MissionState.WAIT_TIRE_BOX, cause="photo_trigger_distance_to_tire")
+                        return
+            # Point-cloud distance check: require close to nearest tire box face (adds robustness if TF/odom drifts)
+            max_to_face = float(self.get_parameter("capture_max_distance_to_tire_face_m").value)
+            if max_to_face > 0 and self._last_tire_box is not None:
+                pose_map = self._get_current_pose_in_map_frame()
+                if pose_map is not None:
+                    dist_to_face = distance_point_to_aabb_2d(
+                        pose_map.pose.position.x,
+                        pose_map.pose.position.y,
+                        self._last_tire_box.xmin,
+                        self._last_tire_box.xmax,
+                        self._last_tire_box.ymin,
+                        self._last_tire_box.ymax,
+                    )
+                    if dist_to_face > max_to_face:
+                        self.get_logger().error(
+                            f"Photo trigger blocked: distance_to_tire_face={dist_to_face:.2f}m > max={max_to_face}m (not close enough)"
+                        )
+                        self._mission_log_append(
+                            "photo_trigger_blocked",
+                            {
+                                "distance_to_tire_face": round(dist_to_face, 3),
+                                "max_distance_to_tire_face_m": max_to_face,
+                                "state": self.current_state,
+                            },
+                            sync=True,
+                        )
+                        self._set_state(MissionState.WAIT_TIRE_BOX, cause="photo_trigger_distance_to_tire_face")
+                        return
+        else:
+            self.get_logger().info(
+                "demo_mode: skipping photo distance gates (photo_trigger_distance, capture_max_distance_to_tire_m, face)"
             )
             self._mission_log_append(
-                "photo_trigger_blocked",
+                "photo_trigger_demo_mode",
                 {
                     "distance_to_goal": distance_to_goal,
-                    "threshold": trigger_threshold,
-                    "state": self.current_state,
+                    "bypass": "distance_gates",
                 },
                 sync=True,
             )
-            self._set_state(MissionState.WAIT_TIRE_BOX, cause="photo_trigger_distance")
-            return
-        # Optional: require close to tire center (avoids capturing when goal was wrong or we never reached tire)
-        max_to_tire = float(self.get_parameter("capture_max_distance_to_tire_m").value)
-        if max_to_tire > 0 and self._last_tire_box is not None:
-            pose_map = self._get_current_pose_in_map_frame()
-            if pose_map is not None:
-                cx = (self._last_tire_box.xmin + self._last_tire_box.xmax) / 2.0
-                cy = (self._last_tire_box.ymin + self._last_tire_box.ymax) / 2.0
-                dx = pose_map.pose.position.x - cx
-                dy = pose_map.pose.position.y - cy
-                dist_to_tire = math.sqrt(dx * dx + dy * dy)
-                if dist_to_tire > max_to_tire:
-                    self.get_logger().error(
-                        f"Photo trigger blocked: distance_to_tire={dist_to_tire:.2f}m > max={max_to_tire}m (not at tire)"
-                    )
-                    self._mission_log_append(
-                        "photo_trigger_blocked",
-                        {
-                            "distance_to_tire": round(dist_to_tire, 3),
-                            "max_distance_to_tire_m": max_to_tire,
-                            "state": self.current_state,
-                        },
-                        sync=True,
-                    )
-                    self._set_state(MissionState.WAIT_TIRE_BOX, cause="photo_trigger_distance_to_tire")
-                    return
-        # Point-cloud distance check: require close to nearest tire box face (adds robustness if TF/odom drifts)
-        max_to_face = float(self.get_parameter("capture_max_distance_to_tire_face_m").value)
-        if max_to_face > 0 and self._last_tire_box is not None:
-            pose_map = self._get_current_pose_in_map_frame()
-            if pose_map is not None:
-                dist_to_face = distance_point_to_aabb_2d(
-                    pose_map.pose.position.x,
-                    pose_map.pose.position.y,
-                    self._last_tire_box.xmin,
-                    self._last_tire_box.xmax,
-                    self._last_tire_box.ymin,
-                    self._last_tire_box.ymax,
-                )
-                if dist_to_face > max_to_face:
-                    self.get_logger().error(
-                        f"Photo trigger blocked: distance_to_tire_face={dist_to_face:.2f}m > max={max_to_face}m (not close enough)"
-                    )
-                    self._mission_log_append(
-                        "photo_trigger_blocked",
-                        {
-                            "distance_to_tire_face": round(dist_to_face, 3),
-                            "max_distance_to_tire_face_m": max_to_face,
-                            "state": self.current_state,
-                        },
-                        sync=True,
-                    )
-                    self._set_state(MissionState.WAIT_TIRE_BOX, cause="photo_trigger_distance_to_tire_face")
-                    return
         if self._tire_registry:
             self._tire_registry[-1]["visited"] = True
         # Store distance for mission report before clearing goal
@@ -4921,6 +6007,7 @@ class VehicleInspectionManager(Node):
         goal_handle = future.result()
         if not goal_handle.accepted:
             self.get_logger().error("Face tire goal rejected.")
+            self._stop_robot()
             self._mission_log_append("nav_rejected", {"goal": "face_tire"}, sync=True)
             self._set_state(MissionState.WAIT_TIRE_BOX, cause="face_tire_rejected")
             return
@@ -4961,6 +6048,7 @@ class VehicleInspectionManager(Node):
                         self._trigger_tire_capture()
                     return
             self.get_logger().warn("Face tire rotation failed; returning to WAIT_TIRE_BOX.")
+            self._stop_robot()
             self._set_state(MissionState.WAIT_TIRE_BOX, cause="face_tire_failed")
             return
         if self.get_parameter("capture_require_wheel_detection").value:
@@ -4972,6 +6060,7 @@ class VehicleInspectionManager(Node):
         goal_handle = future.result()
         if not goal_handle.accepted:
             self.get_logger().error("Rotation goal rejected.")
+            self._stop_robot()
             self._mission_log_append("nav_rejected", {"goal": "rotation_vehicle"}, sync=True)
             self._set_state(MissionState.NEXT_VEHICLE)
             return
@@ -4992,6 +6081,7 @@ class VehicleInspectionManager(Node):
         goal_handle = future.result()
         if not goal_handle.accepted:
             self.get_logger().error("Rotation goal rejected.")
+            self._stop_robot()
             self._mission_log_append("nav_rejected", {"goal": "rotation_tire"}, sync=True)
             # Check if we have enough tires
             if len(self.inspected_tire_positions) >= self.get_parameter("expected_tires_per_vehicle").value:
@@ -5036,6 +6126,7 @@ class VehicleInspectionManager(Node):
         goal_handle = future.result()
         if not goal_handle.accepted:
             self.get_logger().warn("Patrol goal rejected; returning to SEARCH_VEHICLE.")
+            self._stop_robot()
             self._set_state(MissionState.SEARCH_VEHICLE, cause="patrol_rejected")
             return
         self._active_nav_goal_handle = goal_handle
@@ -5056,6 +6147,7 @@ class VehicleInspectionManager(Node):
         goal_handle = future.result()
         if not goal_handle.accepted:
             self.get_logger().error("Search rotation goal rejected.")
+            self._stop_robot()
             self._mission_log_append("nav_rejected", {"goal": "rotation_search"}, sync=True)
             self._mission_report["error_states_encountered"] += 1
             self._publish_mission_report()

@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>ugv_bringup</name>
+  <version>0.0.1</version>
+  <description>Thesis / demo launch entry points (includes full stack from ugv_nav).</description>
+  <maintainer email="user@example.com">ugv</maintainer>
+  <license>Apache-2.0</license>
+  <buildtool_depend>ament_python</buildtool_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>ugv_nav</exec_depend>
+  <exec_depend>segmentation_3d</exec_depend>
+  <exec_depend>inspection_manager</exec_depend>
+  <exec_depend>ugv_base_driver</exec_depend>
+  <exec_depend>rviz2</exec_depend>
+  <exec_depend>slamware_ros_sdk</exec_depend>
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

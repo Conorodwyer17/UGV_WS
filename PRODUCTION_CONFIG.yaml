@@ -46,7 +46,7 @@
 
     # Offsets (meters)
     approach_offset: 0.5
-    tire_offset: 0.4
+    tire_offset: 1.0
     standoff_distance: 2.0
 
     # Tolerances
@@ -88,6 +88,8 @@
     vehicle_max_distance_m: 20.0
     planned_tire_fallback_enabled: true
     planned_tire_box_extent_m: 0.25
+    refinement_max_distance_m: 1.2   # merge YOLO box onto planned/tyre3d goal when within this (m)
+    capture_max_distance_detection_to_expected_tire_m: 1.0
     refinement_ema_alpha: 0.3  # EMA smoothing for goal refinement; reduces flicker from detection jitter
     # require_nav_permitted: gate goals on /stereo/navigation_permitted (depth gate). Set false if
     # depth gate not used (e.g. headless test); aurora_bringup launches navigation_permitted_publisher when use_bridge=false.

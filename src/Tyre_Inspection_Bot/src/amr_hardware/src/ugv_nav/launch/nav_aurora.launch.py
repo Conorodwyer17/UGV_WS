@@ -23,6 +23,7 @@ from launch.actions import (
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.conditions import IfCondition, UnlessCondition
 from launch.substitutions import LaunchConfiguration, PythonExpression
+from launch.utilities import perform_substitutions
 from launch_ros.actions import Node, SetRemap
 
 # Regex to match any absolute path ending with ugv_nav/behavior_trees/ (works for any workspace location)
@@ -36,7 +37,7 @@ def _substitute_bt_paths(content: str, ugv_nav_dir: str) -> str:
 
 
 def _create_nav_with_substituted_params(context):
-    """Create temp param files with substituted BT paths and return nav TimerActions."""
+    """Create temp param files with substituted BT paths, costmap resolution; return nav TimerActions."""
     ugv_nav_dir = get_package_share_directory('ugv_nav')
     param_dir = os.path.join(ugv_nav_dir, 'param')
     param_basenames = [
@@ -46,26 +47,47 @@ def _create_nav_with_substituted_params(context):
         'nav_aurora_tight_ekf.yaml',
         'nav_aurora_sim.yaml',
     ]
+    res = perform_substitutions(
+        context, [LaunchConfiguration('costmap_resolution', default='0.10')]
+    ).strip()
+    local_cmap_hz = perform_substitutions(
+        context, [LaunchConfiguration('costmap_local_update_frequency', default='')]
+    ).strip()
     temp_files = {}
     for basename in param_basenames:
         src_path = os.path.join(param_dir, basename)
         with open(src_path, 'r') as f:
             content = f.read()
         substituted = _substitute_bt_paths(content, ugv_nav_dir)
+        # Force 2D costmap grid resolution (local/global); does not change z_resolution or mask_resolution.
+        substituted = re.sub(
+            r'^(\s*)resolution:\s*[\d.]+(\s*)$',
+            rf'\1resolution: {res}\2',
+            substituted,
+            flags=re.MULTILINE,
+        )
+        substituted = substituted.replace("resolution: 0.05", f"resolution: {res}")
+        # Optional: lower local costmap CPU (default YAML uses 5.0 Hz for local layer)
+        if local_cmap_hz:
+            substituted = substituted.replace(
+                '      update_frequency: 5.0',
+                f'      update_frequency: {local_cmap_hz}',
+                1,
+            )
         fd, tmp_path = tempfile.mkstemp(suffix='.yaml', prefix='nav_aurora_')
         os.close(fd)
         with open(tmp_path, 'w') as f:
             f.write(substituted)
         temp_files[basename] = tmp_path
 
-    sim_tyre = context.perform_substitution(
-        LaunchConfiguration('sim_tyre_detections', default='false')
+    sim_tyre = perform_substitutions(
+        context, [LaunchConfiguration('sim_tyre_detections', default='false')]
     )
-    use_tight = context.perform_substitution(
-        LaunchConfiguration('use_tight_goal_tolerance', default='false')
+    use_tight = perform_substitutions(
+        context, [LaunchConfiguration('use_tight_goal_tolerance', default='false')]
     )
-    use_ekf = context.perform_substitution(
-        LaunchConfiguration('use_ekf', default='false')
+    use_ekf = perform_substitutions(
+        context, [LaunchConfiguration('use_ekf', default='false')]
     )
 
     if sim_tyre == 'true':
@@ -79,12 +101,25 @@ def _create_nav_with_substituted_params(context):
     else:
         params_file = temp_files['nav_aurora.yaml']
 
+    enable_mux = perform_substitutions(
+        context, [LaunchConfiguration('enable_cmd_vel_mux', default='true')]
+    ).lower() in ('true', '1', 'yes')
+    enable_dgate = perform_substitutions(
+        context, [LaunchConfiguration('enable_depth_gate', default='true')]
+    ).lower() in ('true', '1', 'yes')
+    if not enable_mux and not enable_dgate:
+        cmd_vel_dst = 'cmd_vel'
+    elif not enable_mux and enable_dgate:
+        cmd_vel_dst = 'cmd_vel_nav'
+    else:
+        cmd_vel_dst = 'cmd_vel_nav_source'
+
     bringup_dir = get_package_share_directory('nav2_bringup')
     launch_dir = os.path.join(bringup_dir, 'launch')
     nav_group = GroupAction(
         actions=[
             SetRemap(src='/map', dst='/slamware_ros_sdk_server_node/map'),
-            SetRemap(src='cmd_vel', dst='cmd_vel_nav_source'),
+            SetRemap(src='cmd_vel', dst=cmd_vel_dst),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
                     os.path.join(launch_dir, 'navigation_launch.py')
@@ -116,42 +151,88 @@ def _create_nav_with_substituted_params(context):
     ]
 
 
+def _vel_bridge_actions(context):
+    """cmd_vel_mux / depth_gate / vehicle_speed_filter — optional for minimal Jetson demos."""
+    ugv_nav_prefix = get_package_prefix('ugv_nav')
+    cmd_vel_mux_script = os.path.join(ugv_nav_prefix, 'lib', 'ugv_nav', 'cmd_vel_mux_node.py')
+    depth_gate_script = os.path.join(ugv_nav_prefix, 'lib', 'ugv_nav', 'depth_gate_node.py')
+    vehicle_speed_filter_script = os.path.join(
+        ugv_nav_prefix, 'lib', 'ugv_nav', 'vehicle_speed_filter_node.py'
+    )
+    mux_on = perform_substitutions(
+        context, [LaunchConfiguration('enable_cmd_vel_mux', default='true')]
+    ).lower() in ('true', '1', 'yes')
+    dgate_on = perform_substitutions(
+        context, [LaunchConfiguration('enable_depth_gate', default='true')]
+    ).lower() in ('true', '1', 'yes')
+    vsf_on = perform_substitutions(
+        context, [LaunchConfiguration('enable_vehicle_speed_filter', default='true')]
+    ).lower() in ('true', '1', 'yes')
+    actions = []
+    if mux_on:
+        mux_out = 'cmd_vel_nav' if dgate_on else 'cmd_vel'
+        actions.append(
+            ExecuteProcess(
+                cmd=[
+                    sys.executable,
+                    cmd_vel_mux_script,
+                    '--ros-args',
+                    '-p',
+                    f'cmd_vel_out_topic:={mux_out}',
+                ],
+                name='cmd_vel_mux',
+                output='screen',
+            )
+        )
+    if dgate_on:
+        actions.append(
+            ExecuteProcess(
+                cmd=[sys.executable, depth_gate_script],
+                name='depth_gate',
+                output='screen',
+            )
+        )
+    if vsf_on:
+        actions.append(
+            ExecuteProcess(
+                cmd=[
+                    sys.executable,
+                    vehicle_speed_filter_script,
+                    '--ros-args',
+                    '-p',
+                    'vehicle_boxes_topic:=/aurora_semantic/vehicle_bounding_boxes',
+                    '-p',
+                    'filter_mask_topic:=/inspection/speed_filter_mask',
+                    '-p',
+                    'filter_info_topic:=/local_costmap/costmap_filter_info',
+                    '-p',
+                    'mask_frame_id:=slamware_map',
+                    '-p',
+                    'vehicle_buffer_m:=1.5',
+                    '-p',
+                    'speed_percent_in_zone:=50',
+                ],
+                name='vehicle_speed_filter',
+                output='screen',
+            )
+        )
+    return actions
+
+
 def generate_launch_description():
     # Force Fast DDS to use UDP only (avoids SHM port conflicts when multiple ROS processes run).
     # For more reliable Nav2 lifecycle bringup, use Cyclone in *all* terminals:
     #   export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp  (install: ros-humble-rmw-cyclonedds-cpp)
     set_fastdds_udp = SetEnvironmentVariable(name='FASTDDS_BUILTIN_TRANSPORTS', value='UDPv4')
 
-    # TF: Nav2 uses global_frame "map"; Aurora SDK uses "slamware_map".
-    # Publish map->slamware_map (identity) so map frame exists.
-    # Aurora must be running (slamware_map->odom->base_link).
-    # When external_tf:=true (use_mock), aurora_mock provides these; skip to avoid duplicate TF.
-    map_to_slamware_tf = Node(
-        package='tf2_ros',
-        executable='static_transform_publisher',
-        name='map_to_slamware_map',
-        arguments=[
-            '--x', '0',
-            '--y', '0',
-            '--z', '0',
-            '--yaw', '0',
-            '--pitch', '0',
-            '--roll', '0',
-            '--frame-id', 'map',
-            '--child-frame-id', 'slamware_map',
-        ],
-        parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time', default='false')}],
-        condition=UnlessCondition(LaunchConfiguration('external_tf', default='false')),
-    )
-    # base_footprint->base_link from robot_state_publisher (ugv_rover.urdf) in aurora_bringup.
-    # No static base_footprint here to avoid TF cycle.
+    # map->slamware_map, slamware_map->odom: from aurora_bringup world_frame_tf_publisher (current timestamps).
+    # When external_tf:=true (use_mock), aurora_mock provides these; nav_aurora does not duplicate.
+    # base_footprint: from URDF (base_link->base_footprint via robot_state_publisher in aurora_bringup).
 
     # Delay Nav2 bringup so TF and services are ready (Aurora must publish map, odom, scan first).
     # When external_tf (use_mock): 5s so costmap builds TF buffer; else 15s for real Aurora.
     ugv_nav_prefix = get_package_prefix('ugv_nav')
     startup_script = os.path.join(ugv_nav_prefix, 'lib', 'ugv_nav', 'nav_lifecycle_startup.py')
-    depth_gate_script = os.path.join(ugv_nav_prefix, 'lib', 'ugv_nav', 'depth_gate_node.py')
-    cmd_vel_mux_script = os.path.join(ugv_nav_prefix, 'lib', 'ugv_nav', 'cmd_vel_mux_node.py')
     lifecycle_startup = ExecuteProcess(
         cmd=[
             sys.executable, startup_script,
@@ -220,42 +301,44 @@ def generate_launch_description():
             description='Log level for Nav2 nodes (e.g. debug for controller_server lifecycle stall diagnosis)',
         )
     )
-    # cmd_vel mux: nav vs centroid_servo -> cmd_vel_nav (depth_gate subscribes to cmd_vel_nav)
-    cmd_vel_mux = ExecuteProcess(
-        cmd=[sys.executable, cmd_vel_mux_script],
-        name='cmd_vel_mux',
-        output='screen',
+    ld.add_action(
+        DeclareLaunchArgument(
+            'costmap_resolution',
+            default_value='0.10',
+            description='Override Nav2 local/global costmap grid resolution in generated param YAML (Jetson RAM).',
+        )
     )
-    # Depth gate: forwards cmd_vel_nav -> cmd_vel when /stereo/navigation_permitted True
-    depth_gate = ExecuteProcess(
-        cmd=[sys.executable, depth_gate_script],
-        name='depth_gate',
-        output='screen',
+    ld.add_action(
+        DeclareLaunchArgument(
+            'costmap_local_update_frequency',
+            default_value='',
+            description=(
+                'If non-empty, replace local costmap update_frequency (default 5.0 Hz in YAML), e.g. 2.0 for demos.'
+            ),
+        )
     )
-
-    # Vehicle speed filter: publishes dynamic OccupancyGrid mask from vehicle boxes.
-    # Slows robot to 50% when within 1.5 m of detected vehicles (Nav2 SpeedFilter).
-    # Use ExecuteProcess to avoid libexec lookup issues on some platforms (Jetson).
-    vehicle_speed_filter_script = os.path.join(ugv_nav_prefix, 'lib', 'ugv_nav', 'vehicle_speed_filter_node.py')
-    vehicle_speed_filter = ExecuteProcess(
-        cmd=[
-            sys.executable, vehicle_speed_filter_script,
-            '--ros-args',
-            '-p', 'vehicle_boxes_topic:=/aurora_semantic/vehicle_bounding_boxes',
-            '-p', 'filter_mask_topic:=/inspection/speed_filter_mask',
-            '-p', 'filter_info_topic:=/local_costmap/costmap_filter_info',
-            '-p', 'mask_frame_id:=map',
-            '-p', 'vehicle_buffer_m:=1.5',
-            '-p', 'speed_percent_in_zone:=50',
-        ],
-        name='vehicle_speed_filter',
-        output='screen',
+    ld.add_action(
+        DeclareLaunchArgument(
+            'enable_cmd_vel_mux',
+            default_value='true',
+            description='Nav2 vs centroid servo mux. Set false for minimal demo (direct cmd_vel chain).',
+        )
     )
-
-    ld.add_action(map_to_slamware_tf)
-    ld.add_action(cmd_vel_mux)
-    ld.add_action(depth_gate)
-    ld.add_action(vehicle_speed_filter)
+    ld.add_action(
+        DeclareLaunchArgument(
+            'enable_depth_gate',
+            default_value='true',
+            description='Gate cmd_vel on /stereo/navigation_permitted. Set false for bench (bridge off).',
+        )
+    )
+    ld.add_action(
+        DeclareLaunchArgument(
+            'enable_vehicle_speed_filter',
+            default_value='true',
+            description='Publish speed filter mask from vehicle boxes. Set false to save CPU.',
+        )
+    )
+    ld.add_action(OpaqueFunction(function=_vel_bridge_actions))
     ld.add_action(OpaqueFunction(function=_create_nav_with_substituted_params))
     ld.add_action(lifecycle_startup_delayed_ext)
     ld.add_action(lifecycle_startup_delayed_other)

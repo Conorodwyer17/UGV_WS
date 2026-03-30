@@ -1,43 +1,64 @@
 #!/bin/bash
-# Export best_fallback.pt to ONNX for CPU inference (no GPU, no OOM).
-# Run: cd ~/ugv_ws && bash scripts/export_onnx.sh
-# The ultralytics_node_cpu uses best_fallback.onnx when use_cpu_inference:=true.
+# Export a YOLO .pt model to ONNX for ultralytics_node_cpu (CPU inference).
+#
+# Default: best_fallback.pt → best_fallback.onnx (IMGSZ default 224).
+# Tyre model (matches demo_full_visualization + wheel_imgsz default 480):
+#   cd ~/ugv_ws && MODEL_PT=tyre_detection_project/best.pt IMGSZ=480 bash scripts/export_onnx.sh
+#
+# The exported ONNX input size must match launch `wheel_imgsz` (and ultralytics predict imgsz).
 
 set -e
 UGV_WS="${UGV_WS:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 BOT_DIR="${UGV_WS}/src/Tyre_Inspection_Bot"
-MODEL_PT="${BOT_DIR}/best_fallback.pt"
-OUTPUT_ONNX="${BOT_DIR}/best_fallback.onnx"
 
-# Also check workspace root
-if [[ ! -f "$MODEL_PT" ]]; then
-  MODEL_PT="${UGV_WS}/best_fallback.pt"
+if [[ -n "${MODEL_PT:-}" ]]; then
+  # Allow relative path from ugv_ws
+  if [[ "${MODEL_PT}" != /* ]]; then
+    MODEL_PT="${UGV_WS}/${MODEL_PT}"
+  fi
+else
+  MODEL_PT="${BOT_DIR}/best_fallback.pt"
+  if [[ ! -f "$MODEL_PT" ]]; then
+    MODEL_PT="${UGV_WS}/best_fallback.pt"
+  fi
 fi
+
 if [[ ! -f "$MODEL_PT" ]]; then
-  echo "ERROR: best_fallback.pt not found at ${BOT_DIR}/ or ${UGV_WS}/"
+  echo "ERROR: Model not found: ${MODEL_PT}"
+  echo "Set MODEL_PT to your .pt file, e.g. MODEL_PT=\${UGV_WS}/tyre_detection_project/best.pt"
   exit 1
 fi
 
-# ONNX export works on CPU (no CUDA needed)
-IMGSZ="${IMGSZ:-224}"
+OUTPUT_ONNX="${OUTPUT_ONNX:-${MODEL_PT%.pt}.onnx}"
+
+if [[ -z "${IMGSZ:-}" ]]; then
+  if [[ "$MODEL_PT" == *"tyre_detection"* ]]; then
+    IMGSZ=480
+  else
+    IMGSZ=224
+  fi
+fi
+
 echo "Exporting $MODEL_PT to ONNX (imgsz=$IMGSZ)..."
 echo "Output: $OUTPUT_ONNX"
 echo ""
 
-python3 -c "
+export MODEL_PT_FOR_EXPORT="$MODEL_PT"
+export IMGSZ_FOR_EXPORT="$IMGSZ"
+python3 - <<'PY'
+import os
 from ultralytics import YOLO
-model = YOLO('$MODEL_PT')
-model.export(format='onnx', imgsz=$IMGSZ, opset=12, simplify=True)
-"
+p = os.environ["MODEL_PT_FOR_EXPORT"]
+sz = int(os.environ["IMGSZ_FOR_EXPORT"])
+YOLO(p).export(format="onnx", imgsz=sz, opset=12, simplify=True)
+PY
 
-# Ultralytics exports to same dir as input with .onnx extension
 GENERATED="${MODEL_PT%.pt}.onnx"
 if [[ -f "$GENERATED" ]]; then
   if [[ "$GENERATED" != "$OUTPUT_ONNX" ]]; then
     mv -f "$GENERATED" "$OUTPUT_ONNX"
   fi
-  echo "Done. Use use_cpu_inference:=true in launch to use ONNX on CPU."
-  echo "  ./scripts/start_mission.sh use_cpu_inference:=true"
+  echo "Done. Match launch wheel_imgsz to IMGSZ=${IMGSZ} (e.g. demo_full_visualization default 480 for tyre ONNX)."
 else
   echo "ERROR: Export may have failed; $GENERATED not found"
   exit 1

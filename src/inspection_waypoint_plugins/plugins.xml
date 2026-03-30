@@ -1,0 +1,7 @@
+<class_libraries>
+  <library path="photo_capture_waypoint_task">
+    <class type="inspection_waypoint_plugins::PhotoCaptureWaypointTask" base_class_type="nav2_core::WaypointTaskExecutor">
+      <description>Publish capture_photo and wait for capture_result (tyre inspection pipeline).</description>
+    </class>
+  </library>
+</class_libraries>

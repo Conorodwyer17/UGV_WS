@@ -1396,10 +1396,21 @@ namespace slamware_ros_sdk {
             RCLCPP_WARN(rosNodeHandle()->get_logger(), "Depth camera not supported");
         }
 
+        // Optional: disable semantic segmentation (saves device/GPU memory) via ROS param enable_semantic_segmentation
+        bool enableSemantic = true;
+        {
+            auto nh = rosNodeHandle();
+            if (nh->has_parameter("enable_semantic_segmentation")) {
+                enableSemantic = nh->get_parameter("enable_semantic_segmentation").get_value<bool>();
+            }
+        }
+
         // Check semantic segmentation support
         semanticSegmentationSupported_ = auroraSDK->enhancedImaging.isSemanticSegmentationReady();
         if (semanticSegmentationSupported_) {
-            auroraSDK->controller.setEnhancedImagingSubscription(SLAMTEC_AURORA_SDK_ENHANCED_IMAGE_TYPE_SEMANTIC, true);
+            auroraSDK->controller.setEnhancedImagingSubscription(
+                SLAMTEC_AURORA_SDK_ENHANCED_IMAGE_TYPE_SEMANTIC, enableSemantic);
+            if (enableSemantic) {
             RCLCPP_INFO(rosNodeHandle()->get_logger(), "Semantic segmentation supported and subscription enabled");
             
             // Get semantic segmentation label information
@@ -1416,6 +1427,12 @@ namespace slamware_ros_sdk {
                 // Generate class colors
                 generateClassColors(labelInfo.label_count);
                 RCLCPP_INFO(rosNodeHandle()->get_logger(), "Class colors generated");
+            }
+            } else {
+                RCLCPP_WARN(
+                    rosNodeHandle()->get_logger(),
+                    "Semantic segmentation disabled by ROS parameter enable_semantic_segmentation:=false");
+                semanticSegmentationSupported_ = false;
             }
         } else {
             RCLCPP_WARN(rosNodeHandle()->get_logger(), "Semantic segmentation not supported");

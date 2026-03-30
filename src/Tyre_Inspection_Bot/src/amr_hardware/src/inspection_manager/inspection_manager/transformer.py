@@ -3,7 +3,7 @@ from typing import Optional, Tuple
 
 import rclpy
 import tf2_geometry_msgs
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Vector3Stamped
 from tf2_ros import TransformException
 
 
@@ -143,6 +143,35 @@ def transform_pose(
     except Exception as e:
         if logger:
             logger.warn(f"TF transform failed: {e}")
+        return None
+
+
+def transform_vector_xy(
+    tf_buffer,
+    vx: float,
+    vy: float,
+    source_frame: str,
+    target_frame: str,
+    timeout_s: float = 0.5,
+    logger=None,
+) -> Optional[Tuple[float, float]]:
+    """Rotate a 2D direction vector from source_frame into target_frame (translation ignored)."""
+    transform = lookup_transform(tf_buffer, target_frame, source_frame, timeout_s=timeout_s)
+    if transform is None:
+        if logger:
+            logger.warn(f"TF lookup failed for vector: {target_frame}->{source_frame}")
+        return None
+    vs = Vector3Stamped()
+    vs.header.frame_id = source_frame
+    vs.vector.x = float(vx)
+    vs.vector.y = float(vy)
+    vs.vector.z = 0.0
+    try:
+        out = tf2_geometry_msgs.do_transform_vector3(vs, transform)
+        return (float(out.vector.x), float(out.vector.y))
+    except Exception as e:
+        if logger:
+            logger.warn(f"TF vector transform failed: {e}")
         return None
 
 

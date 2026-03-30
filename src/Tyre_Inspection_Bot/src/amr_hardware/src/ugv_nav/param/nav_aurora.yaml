@@ -108,11 +108,11 @@ controller_server:
       debug_trajectory_details: True
       min_vel_x: 0.0
       min_vel_y: 0.0
-      max_vel_x: 0.26
+      max_vel_x: 0.3
       max_vel_y: 0.0
       max_vel_theta: 0.5
       min_speed_xy: 0.0
-      max_speed_xy: 0.26
+      max_speed_xy: 0.3
       min_speed_theta: 0.0
       acc_lim_x: 2.5
       acc_lim_y: 0.0
@@ -160,45 +160,49 @@ local_costmap:
       # If "sensor origin out of map bounds" appears: ensure global_frame matches observation sources
       origin_x: 2.5
       origin_y: 2.5
-      resolution: 0.05
+      resolution: 0.10
+      # Extra shrink of obstacle inflation near robot footprint (helps "start in lethal" when hugging vehicle)
+      footprint_padding: 0.2
       # Waveshare UGV Rover 6-wheel base: 253 × 243 mm (L×W, from drawing); footprint in base_link
       footprint: "[ [0.127, 0.122], [0.127, -0.122], [-0.127, -0.122], [-0.127, 0.122] ]"
-      plugins: ["obstacle_layer", "inflation_layer"]
+      plugins: ["nonpersisting_obstacle_layer", "inflation_layer"]
       filters: ["speed_filter"]
       speed_filter:
         plugin: "nav2_costmap_2d::SpeedFilter"
         filter_info_topic: "costmap_filter_info"
-      # transform_tolerance: 0.5-1.0s for Aurora TF timing (research: nav2_system_tests)
+        transform_tolerance: 2.0  # CostmapFilter: odom<->mask transform (extrapolation errors)
+      transform_tolerance: 2.0  # Point cloud / voxel layer: stamp may lag; allow extrapolation
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
-        inflation_radius: 0.6  # PATH_FORWARD: safety near vehicle; do not reduce below robot half-width
-      obstacle_layer:
-        plugin: "nav2_costmap_2d::ObstacleLayer"
+        inflation_radius: 0.4  # Local layer; wider buffer near obstacles
+      nonpersisting_obstacle_layer:
+        plugin: "nav2_costmap_2d/NonPersistentVoxelLayer"
         enabled: True
-        observation_sources: scan point_cloud
         footprint_clearing_enabled: true
-        scan:
-          topic: /slamware_ros_sdk_server_node/scan  # From Aurora SDK (default namespace)
-          max_obstacle_height: 2.0
-          clearing: True
-          marking: True
-          data_type: "LaserScan"
+        track_unknown_space: true
+        max_obstacle_height: 2.0
+        unknown_threshold: 15
+        mark_threshold: 2
+        combination_method: 1
+        obstacle_range: 3.0
+        origin_z: 0.0
+        z_resolution: 0.05
+        z_voxels: 16
+        publish_voxel_map: true
+        observation_sources: aurora_pointcloud
+        aurora_pointcloud:
+          topic: /segmentation_processor/registered_pointcloud
+          data_type: PointCloud2
+          sensor_frame: camera_depth_optical_frame
+          marking: true
+          clearing: true
+          obstacle_max_range: 3.0
+          obstacle_min_range: 0.1
           raytrace_max_range: 3.0
-          raytrace_min_range: 0.0
-          obstacle_max_range: 2.5
-          obstacle_min_range: 0.0
-        point_cloud:
-          topic: /camera/depth/points  # from depth_to_registered_pointcloud (Aurora native depth)
-          data_type: "PointCloud2"
-          max_obstacle_height: 2.0
-          min_obstacle_height: 0.0
-          clearing: True
-          marking: True
-          raytrace_max_range: 3.0
-          raytrace_min_range: 0.0
-          obstacle_max_range: 2.5
-          obstacle_min_range: 0.0
+          raytrace_min_range: 0.1
+          min_obstacle_height: 0.1
+          max_obstacle_height: 1.8
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
         # Aurora SDK modified to publish map with TRANSIENT_LOCAL QoS for Nav2 compatibility
@@ -215,14 +219,26 @@ global_costmap:
       use_sim_time: False
       # Waveshare UGV Rover 6-wheel base: 253 × 243 mm (L×W)
       footprint: "[ [0.127, 0.122], [0.127, -0.122], [-0.127, -0.122], [-0.127, 0.122] ]"
-      resolution: 0.05
+      footprint_padding: 0.2
+      resolution: 0.10
       track_unknown_space: true
-      plugins: ["static_layer","obstacle_layer","inflation_layer"]
-      obstacle_layer:
-        plugin: "nav2_costmap_2d::ObstacleLayer"
+      transform_tolerance: 0.5  # Allow TF timing slop for point cloud
+      plugins: ["static_layer", "nonpersisting_obstacle_layer", "inflation_layer"]
+      nonpersisting_obstacle_layer:
+        plugin: "nav2_costmap_2d/NonPersistentVoxelLayer"
         enabled: True
-        observation_sources: scan point_cloud
         footprint_clearing_enabled: true
+        track_unknown_space: true
+        max_obstacle_height: 2.0
+        unknown_threshold: 15
+        mark_threshold: 2
+        combination_method: 1
+        obstacle_range: 3.0
+        origin_z: 0.0
+        z_resolution: 0.05
+        z_voxels: 16
+        publish_voxel_map: true
+        observation_sources: scan aurora_pointcloud
         scan:
           topic: /slamware_ros_sdk_server_node/scan  # From Aurora SDK (default namespace)
           max_obstacle_height: 2.0
@@ -233,17 +249,18 @@ global_costmap:
           raytrace_min_range: 0.0
           obstacle_max_range: 2.5
           obstacle_min_range: 0.0
-        point_cloud:
-          topic: /camera/depth/points  # from depth_to_registered_pointcloud (Aurora native depth)
-          data_type: "PointCloud2"
-          max_obstacle_height: 2.0
-          min_obstacle_height: 0.0
-          clearing: True
-          marking: True
+        aurora_pointcloud:
+          topic: /segmentation_processor/registered_pointcloud
+          data_type: PointCloud2
+          sensor_frame: camera_depth_optical_frame
+          marking: true
+          clearing: true
           raytrace_max_range: 3.0
           raytrace_min_range: 0.0
-          obstacle_max_range: 2.5
+          obstacle_max_range: 3.0
           obstacle_min_range: 0.0
+          min_obstacle_height: 0.1
+          max_obstacle_height: 1.8
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
         map_topic: /slamware_ros_sdk_server_node/map
@@ -252,7 +269,8 @@ global_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
-        inflation_radius: 0.35  # IEEE 10606581: allows gaps for inspection
+        # Wider inflation keeps plans away from vehicle skin (pairs with perimeter polyline + tyre standoff).
+        inflation_radius: 0.35
       always_send_full_costmap: True
 
 map_saver:
@@ -268,12 +286,25 @@ planner_server:
   ros__parameters:
     expected_planner_frequency: 20.0
     use_sim_time: false
-    planner_plugins: ["GridBased"]
-    GridBased:
-      plugin: "nav2_navfn_planner/NavfnPlanner"
-      tolerance: 0.5
-      use_astar: false
+    # Global planner: SmacPlanner2D (ros-humble-nav2-smac-planner). If the plugin fails to load, revert to:
+    #   planner_plugins: ["GridBased"]
+    #   GridBased: { plugin: "nav2_navfn_planner/NavfnPlanner", tolerance: 1.0, use_astar: false, allow_unknown: true }
+    # SmacPlanner2D: more robust than Navfn in cluttered / near-obstacle goals (package: ros-humble-nav2-smac-planner).
+    planner_plugins: ["SmacPlanner"]
+    SmacPlanner:
+      plugin: "nav2_smac_planner/SmacPlanner2D"
+      tolerance: 1.0
+      downsample_costmap: false
+      downsampling_factor: 1
       allow_unknown: true
+      max_iterations: 1000000
+      max_on_approach_iterations: 1000
+      max_planning_time: 5.0
+      smooth_path: true
+      motion_model_for_search: "MOORE"
+      angle_quantization_bins: 72
+      minimum_turning_radius: 0.2
+      reverse_penalty: 2.0
     use_final_approach_orientation: True
 
 smoother_server:
@@ -319,11 +350,17 @@ waypoint_follower:
     loop_rate: 20
     # stop_on_failure: false = skip unreachable tyre, continue to next (research: nav2_waypoint_follower)
     stop_on_failure: false
-    waypoint_task_executor_plugin: "wait_at_waypoint"
+    # Tyre inspection: trigger photo_capture_service via topics (inspection_waypoint_plugins package)
+    waypoint_task_executor_plugin: "photo_capture_waypoint_task"
+    photo_capture_waypoint_task:
+      plugin: "inspection_waypoint_plugins::PhotoCaptureWaypointTask"
+      enabled: true
+      capture_photo_topic: "/inspection_manager/capture_photo"
+      capture_result_topic: "/inspection_manager/capture_result"
+      timeout_s: 15.0
     wait_at_waypoint:
       plugin: "nav2_waypoint_follower::WaitAtWaypoint"
-      enabled: True
-      # waypoint_pause_duration: ms to wait at each tyre before photo capture
+      enabled: false
       waypoint_pause_duration: 200
 
 recoveries_server:
@@ -351,8 +388,8 @@ velocity_smoother:
     smoothing_frequency: 20.0
     scale_velocities: False
     feedback: "OPEN_LOOP"
-    max_velocity: [0.26, 0.0, 1.0]
-    min_velocity: [-0.26, 0.0, -1.0]
+    max_velocity: [0.3, 0.0, 0.5]
+    min_velocity: [-0.3, 0.0, -0.5]
     max_accel: [2.5, 0.0, 3.2]
     max_decel: [-2.5, 0.0, -3.2]
     odom_topic: "/slamware_ros_sdk_server_node/odom"  # From Aurora SDK (default namespace)

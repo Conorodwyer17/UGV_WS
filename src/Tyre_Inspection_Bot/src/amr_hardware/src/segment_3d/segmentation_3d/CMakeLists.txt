@@ -114,6 +114,11 @@ install(PROGRAMS
   DESTINATION lib/${PROJECT_NAME}
   RENAME simulated_detection_node
 )
+install(PROGRAMS
+  scripts/tyre_3d_projection_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME tyre_3d_projection_node
+)
 
 # Install header files
 install(DIRECTORY include/${PROJECT_NAME}/

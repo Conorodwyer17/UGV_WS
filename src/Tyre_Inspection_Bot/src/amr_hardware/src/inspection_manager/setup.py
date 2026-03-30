@@ -24,6 +24,7 @@ setup(
             "inspection_manager_node = inspection_manager.inspection_manager_node:main",
             "photo_capture_service = inspection_manager.photo_capture_service:main",
             "visual_servo_align_server = inspection_manager.alignment:main",
+            "demo_cycle_tyre_poses = inspection_manager.demo_cycle_tyre_poses:main",
         ],
     },
 )

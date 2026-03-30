@@ -3,16 +3,62 @@
 ## Canonical stack and topics
 
 - **Building the workspace:** `cd ~/ugv_ws && colcon build --symlink-install && source install/setup.bash`. Place `best_fallback.pt` (or `best_fallback.engine`) in `src/Tyre_Inspection_Bot/` or workspace root. See [Clean build and cleanup](#clean-build-and-cleanup).
-- **Running a mission:** `./scripts/start_mission.sh` (recommended: disk check, Jetson performance, optional verification, then launch). Or `./scripts/startup.sh`; mission auto-starts when TF and Nav2 are ready. See [Option A: Start mission](#option-a-start-mission-recommended).
-- **Canonical launch:** `full_bringup.launch.py` (e.g. via `scripts/mission_launch.sh` or `scripts/startup.sh`). For real missions on the Jetson, use this launch — it starts the Aurora SDK, motor driver, Nav2, perception, and inspection manager. Do not use `inspection_full_mission.launch.py` alone (it does not start the Aurora SDK by default).
+- **Running a mission:** `./scripts/start_mission.sh` (recommended: disk check, Jetson performance, optional verification, then launch). **Default `MISSION_PROFILE=mission_dedicated_cpu`:** dedicated **`tyre_detection_project/best.pt`** on **CPU** (ONNX `best.onnx` at **480×480**), **real motor**, throttled depth (**2 Hz**), costmap **0.10 m**. Export ONNX if missing: `MODEL_PT=tyre_detection_project/best.pt IMGSZ=480 bash scripts/export_onnx.sh`. Stress / thesis: `MISSION_PROFILE=crash_fallback_seg`. Stub motor: `MISSION_PROFILE=stable_viz`. Or `./scripts/startup.sh`; mission auto-starts when TF and Nav2 are ready. See [Option A: Start mission](#option-a-start-mission-recommended) and [Remote RViz monitoring](#remote-rviz-monitoring-laptop).
+- **Canonical launch:** `full_bringup.launch.py` (e.g. via `scripts/mission_launch.sh` or `scripts/startup.sh`). For real missions on the Jetson, use this launch — it starts the Aurora SDK, motor driver, Nav2, perception, and inspection manager. On **memory-constrained** platforms (e.g. Jetson Orin Nano 8 GB), prefer **modular** `ugv_bringup` demos (`demo_*.launch.py`) for thesis or bench validation; see [Modular demonstration guide](#modular-demonstration-guide-thesis--constrained-jetson). Do not use `inspection_full_mission.launch.py` alone (it does not start the Aurora SDK by default).
 - **Simulation (no hardware):** Use `ros2 launch sim vehicle_inspection_sim.launch.py use_mock:=true` for full simulation with synthetic Aurora. Note: `full_bringup.launch.py` does not fully support mock mode; it is intended for real hardware.
 - **Mission node:** **inspection_manager_node**. Flow: IDLE → SEARCH_VEHICLE → WAIT_VEHICLE_BOX → (first goal = **nearest corner**, then tyres 2–4 by distance). See [MISSION_PIPELINE.md](docs/MISSION_PIPELINE.md) for tyre order and scenario behaviour.
 - **First goal:** Always the **nearest** of the four tire corners (not “front left first” or clockwise). Flow: WAIT_VEHICLE_BOX → APPROACH_VEHICLE → WAIT_TIRE_BOX → INSPECT_TIRE / FACE_TIRE → VERIFY_CAPTURE (repeat tires, then NEXT_VEHICLE or DONE).
 - **Vehicle boxes:** Primary `/aurora_semantic/vehicle_bounding_boxes`. YOLO vehicle node is **disabled by default** (`use_vehicle_yolo:=false`) to save GPU/CPU; use `use_vehicle_yolo:=true` for YOLO fallback (feasible on 16 GB Jetson as redundant detection source).
 - **Tyre boxes:** `/darknet_ros_3d/tire_bounding_boxes` (YOLO) and merged `/tire_bounding_boxes_merged` when PCL fallback enabled.
 - **Tyre class:** `wheel` (best_fallback.pt), per PRODUCTION_CONFIG `tire_label`.
+- **Direct 3D tyre poses (optional):** `tyre_3d_projection_node` fuses wheel masks from `/ultralytics_tire/segmentation/objects_segment` with depth → `/tyre_3d_positions` (`geometry_msgs/PoseArray`, frame `slamware_map`) and `/tyre_markers` for RViz. Enable mission use with `use_tyre_3d_positions:=true` on `full_bringup` / `inspection_manager.launch.py`, or `ros2 launch ugv_bringup demo_tyre_inspection.launch.py` (sets it true; default `wheel_imgsz:=480` for 8GB Jetson). **GPU RAM:** `ros2 launch ugv_bringup minimal_tyre_inspection.launch.py` skips semantic fusion, tire `segmentation_processor`, PCL merger, centroid servo, and RViz vehicle markers (`minimal_perception`) and sets `pcl_fallback_enabled:=false`, `require_detection_topic_at_startup:=false`.
+
+### Tyre 3D goals vs planned corners (Nav2 planning)
+
+- **Behaviour (2026-03):** With `use_tyre_3d_positions:=true` (default on `full_bringup`), **WAIT_TIRE_BOX** tries **`/tyre_3d_positions` first** on each tick: fresh poses (header age ≤ `tyre_3d_stale_s`, default **1.0 s**), nearest tyre in range, standoff **along robot→tyre** using `tire_offset` (default **1.0 m** in PRODUCTION_CONFIG). If that succeeds, the mission logs `tyre_3d_wait_tire_box_dispatch` and removes the nearest **planned** corner within `tyre_3d_prune_planned_radius_m` (default **1.2 m**) so the box-derived plan does not send a duplicate goal to the same tyre.
+- **Fallback:** If no fresh 3D pose or dispatch fails, the state machine continues with **planned corners** from the committed vehicle box (strict order / cache / timeout fallback as before).
+- **Nav2:** `nav_aurora.yaml` uses **SmacPlanner2D** (`nav2_smac_planner` package) with **global `inflation_radius` 0.2** and planner **tolerance 1.0** so goals near inflated vehicle cells can still get a plan. If Smac fails to load at startup, fall back to **GridBased** / Navfn with the same tolerance (comment in `nav_aurora.yaml`).
+- **Debug cost at goal:** `python3 scripts/costmap_value_at_xy.py <x> <y>` (optional `--service /global_costmap/get_cost_global_costmap` or local costmap service).
+- **Nav2 BT planner ID:** `ugv_nav/behavior_trees/navigate_to_pose_no_spin.xml` (and `navigate_through_poses_no_spin.xml`) set **`planner_id="SmacPlanner"`** to match `nav_aurora.yaml` `planner_plugins`. If you change the YAML back to GridBased/Navfn, set the BT **`planner_id`** to **`GridBased`** as well.
+- **Tyre 3D “stale” / skip logs:** If you see `tyre_3d WAIT_TIRE_BOX: skip direct goal (...)` in logs, the reason string explains it (e.g. stale, out of range). Message age uses `max(0, now−stamp)` so slightly future timestamps do not falsely mark data stale. Defaults: `tyre_3d_stale_s` **2.0**, range **0.4–5.0** m.
 - **Start mission:** With default `start_mission_on_ready: true`, the mission auto-starts when TF and Nav2 are ready. Otherwise publish once: `ros2 topic pub --once /inspection_manager/start_mission std_msgs/msg/Bool "{data: true}"`. Goals are in `map` frame; Aurora TF chain (map → slamware_map → odom → base_link) is required.
 - **Field readiness:** Pre-field checklist: [docs/ACCEPTANCE_CRITERIA.md](docs/ACCEPTANCE_CRITERIA.md). Mission report includes per-tire `goal_source` (`planned` / `detection` / `detection_refined`) for observability.
+
+---
+
+## Planning test (stub motor, no motion)
+
+To **only validate goals and Nav2 plans in RViz** (no driving), see **[docs/PLANNING_TEST_STUB_MOTOR.md](docs/PLANNING_TEST_STUB_MOTOR.md)**. Quick command: `MISSION_PROFILE=stable_viz ./scripts/start_mission.sh --no-verify` (same CPU tyre stack as `mission_dedicated_cpu`, **`sim_no_move:=true`**).
+
+---
+
+## Full mission (real motion) — Jetson checklist
+
+Use this for **autonomous driving** with the **dedicated tyre model** on **CPU** (minimises GPU memory pressure on 8 GB Jetsons).
+
+| Step | Action |
+|------|--------|
+| 1 | `cd ~/ugv_ws && source install/setup.bash` |
+| 2 | Ensure **`tyre_detection_project/best.onnx`** exists (same **`IMGSZ`** as `wheel_imgsz`, default **480**). If not: `MODEL_PT=tyre_detection_project/best.pt IMGSZ=480 bash scripts/export_onnx.sh` |
+| 3 | Optional: `python3 scripts/check_mission_topics.py --timeout 60` **after** the stack is up (confirms `/ultralytics_tire/segmentation/image`, vehicle/tyre markers, `/plan`, `/local_plan`) |
+| 4 | Launch: `./scripts/start_mission.sh` (default profile **`mission_dedicated_cpu`**). Overrides: `./scripts/start_mission.sh --no-verify wheel_imgsz:=480` etc. |
+| 5 | **Same `ROS_DOMAIN_ID`** on Jetson and any laptop running RViz. Default is **0** on both. |
+
+**Canonical topics (visualisation):** vehicle **`/aurora_semantic/vehicle_bounding_boxes`** (manager) / **`/aurora_semantic/vehicle_markers`** (RViz); tyre overlay **`/ultralytics_tire/segmentation/image`**; tyre markers **`/tyre_markers`**; plans **`/plan`**, **`/local_plan`**.
+
+---
+
+## Remote RViz monitoring (laptop)
+
+On a **second machine** with ROS 2 **Humble** (or compatible), on the **same LAN** and **`ROS_DOMAIN_ID`** as the Jetson:
+
+1. Build or sync the workspace so `ugv_bringup` is available, **or** copy `config/full_mission_monitoring.rviz` from the repo.
+2. `export ROS_DOMAIN_ID=0` (must match the robot).
+3. Run **`~/ugv_ws/scripts/monitor_mission.sh`**  
+   Or manually:  
+   `rviz2 -d $(ros2 pkg prefix ugv_bringup)/share/ugv_bringup/config/full_mission_monitoring.rviz`
+4. The config is a copy of **`full_visualization.rviz`** (Image: `/ultralytics_tire/segmentation/image`, MarkerArray: `/aurora_semantic/vehicle_markers`, `/tyre_markers`, Path: `/plan`, `/local_plan`, RobotModel: `/robot_description`, optional costmaps / registered cloud). **Fixed frame:** `map`. If TF is wrong, try **`slamware_map`** in RViz **Global Options**.
+5. Use Cyclone DDS on both ends: `export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp` (already set by `start_mission.sh` / bringup on the robot).
 
 ---
 
@@ -68,6 +114,12 @@ These ensure the mission does not spin in circles, knows where it is and where i
 | **Nav2 before start** | Mission does not leave IDLE until Nav2 `navigate_to_pose` action server is available (up to `nav2_wait_timeout`, 90 s). Otherwise ERROR. |
 | **No spin at vehicle** | Approach is dispatched **once per entry** into WAIT_VEHICLE_BOX when we have a vehicle box (from SEARCH, NEXT_VEHICLE, or after TURN_IN_PLACE_VEHICLE). We only transition to APPROACH_VEHICLE when `_dispatch_box_goal` **succeeds** (TF + Nav2 OK). |
 | **Goal rejected** | If Nav2 rejects the goal, we immediately return to WAIT_VEHICLE_BOX (or WAIT_TIRE_BOX for tyres) so we can retry on next tick/callback instead of staying stuck in APPROACH_VEHICLE. |
+| **Nav failure / stop** | On NavigateToPose **failure** (not forced success), the mission manager publishes **zero cmd_vel** several times so the base does not coast into obstacles if the controller keeps a residual command. Log: `nav_failure_stop_cmd_vel`. |
+| **Lethal start / backup** | Before each **NavigateToPose** and **FollowWaypoints** dispatch, `escape_lethal_start_if_needed()` queries **`global_costmap/get_cost_global_costmap`** (footprint). If the robot is in **lethal** cost (at inscribed inflated threshold), it performs a short **open-loop reverse** (params `pre_nav_lethal_*`), waits `post_capture_costmap_settle_s`, then retries. If still lethal, the goal is **not** sent (`pre_nav_lethal_refuse`). |
+| **After photo backup** | After a **verified** capture while more tyres remain on the vehicle, **`_post_capture_backup_sync()`** reverses briefly (`post_capture_backup_*`) so the next plan does not start from inside the vehicle inflation. |
+| **Nav failure / stop** | On NavigateToPose **failure** (not forced success), the mission manager publishes **zero `cmd_vel`** several times so the base does not coast into obstacles if the controller keeps a residual command. Log: `nav_failure_stop_cmd_vel`. |
+| **Lethal start / backup** | Before each **NavigateToPose** and **FollowWaypoints** dispatch, `escape_lethal_start_if_needed()` queries **`global_costmap/get_cost_global_costmap`** (footprint). If the robot is in **lethal** cost (≥ inscribed inflated), it performs a short **open-loop reverse** (params `pre_nav_lethal_*`), waits `post_capture_costmap_settle_s`, then retries. If still lethal, the goal is **not** sent (`pre_nav_lethal_refuse`). |
+| **After photo backup** | After a **verified** capture while more tyres remain on the vehicle, **`_post_capture_backup_sync()`** reverses briefly (`post_capture_backup_*`) so the next plan does not start from inside the vehicle inflation. |
 | **TF lost mid-mission** | TF watchdog: if TF is invalid for > `tf_watchdog_timeout` (0.2 s), we **cancel the in-flight Nav2 goal** so the robot stops; we pause ticks until TF is valid again. After `tf_unavailable_abort_s` (60 s) of continuous TF failure, transition to ERROR. |
 | **Recovery and watchdog** | Recovery: Nav2 behaviour tree runs ClearCostmap → Wait → BackUp on failure. Inspection manager tracks `number_of_recoveries`; after `max_recoveries_before_skip` (and still far from goal), the current tyre can be skipped (recovery-aware skip). No process-level auto-restart of nodes (optional future work). See [TIRE_DETECTION_TROUBLESHOOTING.md](docs/TIRE_DETECTION_TROUBLESHOOTING.md). |
 | **Nav stuck** | If we stay in APPROACH_VEHICLE or INSPECT_TIRE longer than `approach_timeout_s` (120 s), we cancel the goal and return to WAIT_VEHICLE_BOX or WAIT_TIRE_BOX to retry or rotate. |
@@ -515,6 +567,104 @@ To ensure simulation matches field behavior:
 3. **Acceptance:** Sim should achieve same outcome as real (4 tyres captured, no errors) when vehicle geometry and environment match. Differences indicate sim gaps (e.g. costmap, depth, detection) to address.
 
 **Multi-vehicle testing:** `vehicle_count:=2` or `vehicle_count:=3` to test sequencing and return-later across vehicles. **Stress-test:** `use_stress_test:=true` to inject noise, latency, jitter, dropout, and tire misses; mission may still complete or fail in a controlled way.
+
+---
+
+## Modular demonstration guide (thesis / constrained Jetson)
+
+On **Jetson Orin Nano 8 GB** (and similar), running Aurora + Nav2 + tyre YOLO **together** often exceeds unified memory. For demonstrations, use **one** modular launch at a time from `ugv_bringup` instead of `full_bringup.launch.py`. Each demo sets `RMW_IMPLEMENTATION=rmw_cyclonedds_cpp` (match in all terminals).
+
+### Demonstration checklist (full pipeline, stub motor)
+
+Use this for a **single-launch** software demonstration: perception → Nav2 planning → mission goals → photo service, **without** physical motion (**`stub_motor`** discards `/cmd_vel`). Requires Aurora + Jetson on the same network as in the rest of this runbook.
+
+| Step | What to do |
+|------|------------|
+| 1 | `cd ~/ugv_ws && source install/setup.bash` |
+| 2 | `ros2 launch ugv_bringup demo_full_visualization.launch.py` — optional: `use_cpu_inference:=false` for GPU + TensorRT if the platform is stable. |
+| 3 | Wait **~100 s** (or `inspection_delay_s`) until `ros2 node list` filtered for `inspection_manager` and `photo_capture` shows both nodes. |
+| 4 | Place a vehicle in view. In RViz: **vehicle** markers (`/aurora_semantic/vehicle_markers`), **tyre** markers (`/tyre_markers`), **YOLO overlay** (`/ultralytics_tire/segmentation/image`). |
+| 5 | `ros2 topic echo /tyre_3d_positions --once` — non-empty `poses` when tyres are detected and projection is active. |
+| 6 | Confirm **global plan** `/plan` and **local plan** `/local_plan` in RViz; after mission start, watch **`inspection_manager`** logs for `/tyre_3d_positions`, `tyre_3d: navigating`, `NAV_COMMAND_SENT`, or `Sending navigation goal`. |
+| 7 | Optional: use RViz **2D Goal Pose** to request a path manually (independent of the mission). |
+| 8 | Manual photo: `ros2 service call /photo_capture_service/capture_photo std_srvs/srv/Trigger` |
+| 9 | **Expectation:** The base does **not** move; **`stub_motor`** proves cmd_vel is generated (Nav2) but not applied. |
+
+Further detail and parameter defaults: [Full visualisation demo (no motion)](#full-visualisation-demo-no-motion). For thesis **numbers** (inference ms, costmap before/after), see `thesis/performance_improvements.md`.
+
+| Demo | What it shows | Launch |
+|------|----------------|--------|
+| **Aurora vehicle** | Semantic vehicle boxes → `/aurora_semantic/vehicle_markers`, depth registered cloud, left camera | `ros2 launch ugv_bringup demo_aurora_vehicle.launch.py` |
+| **Tyre detection** | Tyre YOLO + `tyre_3d_projection_node`, `/tyre_markers`, overlay image | `ros2 launch ugv_bringup demo_tyre_detection.launch.py` — add `use_cpu_inference:=true` if GPU OOM |
+| **Navigation** | Aurora + depth @ 2 Hz + Nav2 @ 0.10 m + cmd_vel chain | `ros2 launch ugv_bringup demo_navigation.launch.py` — **2D Goal Pose** in RViz, or `ros2 run teleop_twist_keyboard teleop_twist_keyboard` |
+| **Photo capture** | Camera + `photo_capture_service` only | `ros2 launch ugv_bringup demo_photo_capture.launch.py` then `ros2 service call /photo_capture_service/capture_photo std_srvs/srv/Trigger` |
+| **Full visualisation (no motion)** | Entire perception + Nav2 + plans; **`stub_motor`** only | `ros2 launch ugv_bringup demo_full_visualization.launch.py` — see [Full visualisation demo](#full-visualisation-demo-no-motion) |
+
+**RViz:** configs install to `share/ugv_bringup/config/` (`aurora_vehicle.rviz`, `tyre_detection.rviz`, `navigation.rviz`, `full_visualization.rviz`, **`full_mission_monitoring.rviz`** for remote mission monitoring; `photo_capture.rviz` is available if you open RViz manually).
+
+**Topics (spot-check):** `ros2 topic list` — vehicle: `/aurora_semantic/vehicle_markers`, `/segmentation_processor/registered_pointcloud`; tyre: `/ultralytics_tire/segmentation/image`, `/tyre_markers`; nav: `/local_costmap/costmap`, `/plan`; photo: `/slamware_ros_sdk_server_node/left_image_raw`.
+
+**Load:** `tegrastats`, `htop` — run one demo at a time.
+
+---
+
+## Full visualisation demo (no motion)
+
+Single launch that runs **Aurora (semantic on)**, **full `segment_3d`** (vehicle fusion + markers, tyre YOLO + `tyre_3d_projection_node`, depth registered @ 2 Hz), and **Nav2**, but replaces the real motor with **`stub_motor_node`**: it subscribes to `/cmd_vel` and discards commands. Nav2 still plans and publishes velocities—RViz shows **global/local plans and costmaps** as if the robot would drive. **`cmd_vel_mux`**, **`depth_gate`**, and **`vehicle_speed_filter`** are **off** to save CPU.
+
+**Defaults (stability on 8 GB Jetson):** `use_cpu_inference:=true` — the demo **overrides `wheel_inspection_model` to `tyre_detection_project/best.pt`** so `segment_3d` never passes a **`.engine`** into the CPU pipeline. The CPU executable is **`ultralytics_node_cpu`**, which loads **ONNX** (`best.onnx` next to `best.pt`, or falls back to `best_fallback.onnx`). Export ONNX from your `.pt` if needed (see `scripts/export_onnx.sh` / project docs). **`prefer_tensorrt_inspection` is forced false** on CPU.
+
+**GPU tyre inference:** `use_cpu_inference:=false` — uses **`ultralytics_node`** with `wheel_inspection_model` (default: `.engine` if present, else `.pt`). The launch passes **`device` as the string `"0"`** (not integer `0`). TensorRT loads only on this path. If CUDA OOM occurs, use CPU mode or lower `wheel_imgsz` (e.g. `320`).
+
+**CPU ONNX input size:** `wheel_imgsz` must match the ONNX export (default **`480`** in `demo_full_visualization`). If you see ONNX dimension errors, re-export:  
+`cd ~/ugv_ws && MODEL_PT=tyre_detection_project/best.pt IMGSZ=480 bash scripts/export_onnx.sh`  
+Then relaunch with matching `wheel_imgsz:=480` (default).
+
+**Jetson (or single machine):**
+
+```bash
+cd ~/ugv_ws && source install/setup.bash
+ros2 launch ugv_bringup demo_full_visualization.launch.py
+```
+
+**GPU run (optional):**
+
+```bash
+ros2 launch ugv_bringup demo_full_visualization.launch.py use_cpu_inference:=false
+```
+
+**Laptop RViz (same LAN, same `ROS_DOMAIN_ID`):** after sourcing the workspace that has `ugv_bringup` installed (or copy `config/full_visualization.rviz`):
+
+```bash
+rviz2 -d $(ros2 pkg prefix ugv_bringup)/share/ugv_bringup/config/full_visualization.rviz
+```
+
+For **full mission** monitoring (same displays, dedicated for field use), prefer **`scripts/monitor_mission.sh`** or:
+
+```bash
+rviz2 -d $(ros2 pkg prefix ugv_bringup)/share/ugv_bringup/config/full_mission_monitoring.rviz
+```
+
+**What to show:** **RobotModel** uses **`/robot_description`** (from `robot_state_publisher` in `aurora_bringup`). **Map** and **LaserScan** use Aurora topics; **Registered depth** and costmaps use `/segmentation_processor/registered_pointcloud`; **Vehicle boxes** → `/aurora_semantic/vehicle_markers`; **Tyre markers** → `/tyre_markers`; **Tyre YOLO overlay** → `/ultralytics_tire/segmentation/image` (published by **both** GPU and CPU tyre nodes); Nav2 **global plan** (`/plan`) and **local plan** (`/local_plan`) plus costmaps are enabled in `full_visualization.rviz`; use **2D Goal Pose** for a manual path check—the base will not move because **`stub_motor`** discards `/cmd_vel`. **Fixed frame** is `map`.
+
+**Mission + tyre navigation (this launch):** After **`inspection_delay_s`** (default **100 s**), **`inspection_manager.launch.py`** starts **`inspection_manager_node`** and **`photo_capture_service`**. Launch arguments align perception with `segment_3d`: **`use_tyre_3d_positions:=true`**, **`tire_detection_topic:=/darknet_ros_3d/tire_bounding_boxes`**, **`require_detection_topic_at_startup:=false`**, **`require_nav_permitted:=false`** (depth gate is off in this demo), **`launch_visual_servo:=false`**. With default **`start_mission_on_ready: true`** in `PRODUCTION_CONFIG.yaml`, the mission leaves **IDLE** once TF and Nav2 are ready; in **SEARCH_VEHICLE** / **WAIT_VEHICLE_BOX** the node calls **`_try_dispatch_from_tyre_3d()`** so a tyre in range can trigger a planned-tire goal without waiting for a full vehicle pipeline. Watch the **`inspection_manager`** terminal for **`/tyre_3d_positions: N pose(s)`**, **`tyre_3d: navigating to nearest tyre`**, and **`NAV_COMMAND_SENT`** / **`Sending navigation goal`**. In RViz, the red **`/plan`** path should appear toward the tyre standoff.
+
+**Manual photo (demonstration):** The camera saver exposes **`std_srvs/srv/Trigger`** on **`/photo_capture_service/capture_photo`** (same service documented in `photo_capture_service.py`). Example:
+
+```bash
+ros2 service call /photo_capture_service/capture_photo std_srvs/srv/Trigger
+```
+
+**Thesis-style checklist (stub motor — software pipeline only):**
+
+1. `cd ~/ugv_ws && source install/setup.bash` and launch `demo_full_visualization.launch.py`.
+2. Wait **~100 s** after start (or your `inspection_delay_s`) until `ros2 node list | grep -E 'inspection_manager|photo_capture'` shows both nodes.
+3. Place a vehicle in view; confirm semantic vehicle markers and tyre overlay / `/tyre_markers`.
+4. Confirm `/tyre_3d_positions` is publishing: `ros2 topic echo /tyre_3d_positions --once` (non-empty when tyres are visible).
+5. In RViz, confirm **`/plan`** (and **`/local_plan`**) updates when the mission sends a goal; the robot does not translate because **`stub_motor`** consumes **`/cmd_vel`**.
+6. Optional: run the **`Trigger`** service above to save a snapshot; full **VERIFY_CAPTURE** still expects the manager’s topic flow during a real mission.
+
+**Parameters (defaults):** costmap resolution **0.10 m**, local costmap update rate **2 Hz** (via `nav_aurora` YAML override), tyre inference throttled to **~2 Hz** (`inference_interval_s:=0.5`), depth cloud **2 Hz**, **`inspection_delay_s`** **100** (override if Nav2 needs more time on first boot).
 
 ---
 

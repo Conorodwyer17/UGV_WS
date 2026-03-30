@@ -1,4 +1,7 @@
 # Full stack bringup: Aurora, Nav2, perception (segment_3d), inspection manager, motor driver.
+# **Thesis / bench demos:** Prefer modular launches in `ugv_bringup` (`demo_*.launch.py`) so each
+# subsystem runs in isolation on memory-constrained Jetsons. Use this file for full integration
+# reference or 16 GB+ hardware—not as the default demo entry point on 8 GB without tuning.
 # Starts everything in order with delays so dependencies are up before clients.
 # Inspection manager is delayed until after Nav2 lifecycle (120s in nav_aurora) so the
 # NavigateToPose action server is available when the mission tries to rotate/drive.
@@ -15,6 +18,7 @@ from launch.actions import (
     DeclareLaunchArgument,
     ExecuteProcess,
     IncludeLaunchDescription,
+    OpaqueFunction,
     SetEnvironmentVariable,
     TimerAction,
 )
@@ -22,6 +26,7 @@ from launch.conditions import IfCondition
 from launch.substitutions import PythonExpression
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
+from launch.utilities import perform_substitutions
 from launch_ros.actions import Node
 
 
@@ -97,6 +102,76 @@ def generate_launch_description():
         default_value="true",
         description="Gate goals on depth gate. Set false for headless runs without /stereo/navigation_permitted.",
     )
+    use_tyre_3d_positions_arg = DeclareLaunchArgument(
+        "use_tyre_3d_positions",
+        default_value="true",
+        description="inspection_manager: navigate from /tyre_3d_positions (tyre_3d_projection_node) when true.",
+    )
+    inspection_delay_s_arg = DeclareLaunchArgument(
+        "inspection_delay_s",
+        default_value="90.0",
+        description="Seconds after launch before starting inspection_manager (Nav2 lifecycle must be up). 60–120 typical; lower for quick bench tests.",
+    )
+    require_detection_topic_at_startup_arg = DeclareLaunchArgument(
+        "require_detection_topic_at_startup",
+        default_value="true",
+        description="inspection_manager: wait for tire merge topic at startup. Set false for minimal_perception + tyre_3d only.",
+    )
+    demo_mode_arg = DeclareLaunchArgument(
+        "demo_mode",
+        default_value="false",
+        description="inspection_manager: bypass photo distance gates (stable_viz / stub motor).",
+    )
+    demo_simulate_nav_success_topic_arg = DeclareLaunchArgument(
+        "demo_simulate_nav_success_topic",
+        default_value="",
+        description="inspection_manager: Empty on this topic → synthetic Nav2 arrival in INSPECT_TIRE when demo_mode.",
+    )
+    use_tyre_geometry_arg = DeclareLaunchArgument(
+        "use_tyre_geometry",
+        default_value="true",
+        description="inspection_manager: infer vehicle frame from /tyre_3d_positions when possible.",
+    )
+    use_batch_waypoints_arg = DeclareLaunchArgument(
+        "use_batch_waypoints",
+        default_value="false",
+        description="inspection_manager: Nav2 followWaypoints with full perimeter+standoff list in map frame (vs sequential goals).",
+    )
+    enable_tyre_3d_projection_arg = DeclareLaunchArgument(
+        "enable_tyre_3d_projection",
+        default_value="true",
+        description="segment_3d: launch tyre_3d_projection_node.",
+    )
+    tyre_3d_sync_slop_s_arg = DeclareLaunchArgument(
+        "tyre_3d_sync_slop_s",
+        default_value="2.0",
+        description="tyre_3d_projection: max |seg−depth| stamp delta (s); latest mode warns above this.",
+    )
+    tyre_3d_depth_pairing_mode_arg = DeclareLaunchArgument(
+        "tyre_3d_depth_pairing_mode",
+        default_value="latest",
+        description='tyre_3d_projection: "latest" (depth cache + ObjectsSegment) or "approximate" (message_filters).',
+    )
+    tyre_3d_tf_lookup_use_latest_arg = DeclareLaunchArgument(
+        "tyre_3d_tf_lookup_use_latest",
+        default_value="false",
+        description="tyre_3d_projection: prefer latest TF (stub / extrapolation).",
+    )
+    minimal_perception_arg = DeclareLaunchArgument(
+        "minimal_perception",
+        default_value="false",
+        description="segment_3d: skip heavy nodes (semantic fusion, markers, tire seg_processor, PCL) for Jetson GPU RAM.",
+    )
+    pcl_fallback_enabled_arg = DeclareLaunchArgument(
+        "pcl_fallback_enabled",
+        default_value="true",
+        description="segment_3d: tire_detector_pcl + tire_merger. Set false with minimal_perception on 8GB Jetson.",
+    )
+    centroid_servo_enabled_arg = DeclareLaunchArgument(
+        "centroid_servo_enabled",
+        default_value="true",
+        description="segment_3d: centroid_servo_node. Set false to save CPU/GPU.",
+    )
     # Tire detection overrides (forwarded to segment_3d); see docs/TIRE_DETECTION_TROUBLESHOOTING.md
     prefer_tensorrt_inspection_arg = DeclareLaunchArgument(
         "prefer_tensorrt_inspection",
@@ -111,7 +186,12 @@ def generate_launch_description():
     wheel_imgsz_arg = DeclareLaunchArgument(
         "wheel_imgsz",
         default_value="640",
-        description="segment_3d: inference size. 640 for 16 GB Jetson; 480 or 416 for faster inference on 8 GB.",
+        description="segment_3d: GPU tyre inference size. CPU ONNX uses tyre_onnx_imgsz (default 480).",
+    )
+    tyre_onnx_imgsz_arg = DeclareLaunchArgument(
+        "tyre_onnx_imgsz",
+        default_value="480",
+        description="segment_3d ultralytics_node_cpu: square ONNX input (must match export). Ignores wheel_imgsz.",
     )
     wheel_confidence_arg = DeclareLaunchArgument(
         "wheel_confidence",
@@ -132,6 +212,53 @@ def generate_launch_description():
         "inference_interval_s",
         default_value="0.1",
         description="segment_3d: seconds between GPU tire inferences. 0.1 = 10 Hz for 16 GB Jetson.",
+    )
+    _fb_pt = os.path.join(workspace_root, "src", "Tyre_Inspection_Bot", "best_fallback.pt")
+    _tp = os.path.join(workspace_root, "tyre_detection_project")
+    _te = os.path.join(_tp, "best.engine")
+    _tpt = os.path.join(_tp, "best.pt")
+    _default_wheel_inspection = (
+        _te if os.path.isfile(_te) else (_tpt if os.path.isfile(_tpt) else _fb_pt)
+    )
+    wheel_inspection_model_arg = DeclareLaunchArgument(
+        "wheel_inspection_model",
+        default_value=_default_wheel_inspection,
+        description="segment_3d: tyre YOLO/TensorRT model path (.engine preferred).",
+    )
+    enable_semantic_segmentation_arg = DeclareLaunchArgument(
+        "enable_semantic_segmentation",
+        default_value="true",
+        description="Aurora SDK: subscribe to semantic segmentation (device GPU). Set false to reduce memory.",
+    )
+    costmap_resolution_arg = DeclareLaunchArgument(
+        "costmap_resolution",
+        default_value="0.10",
+        description="Nav2: override local/global costmap grid resolution in generated YAML.",
+    )
+    enable_cmd_vel_mux_arg = DeclareLaunchArgument(
+        "enable_cmd_vel_mux",
+        default_value="true",
+        description="Nav2: centroid vs nav mux. Set false for direct cmd_vel (minimal demo).",
+    )
+    enable_depth_gate_arg = DeclareLaunchArgument(
+        "enable_depth_gate",
+        default_value="true",
+        description="Nav2: gate motion on /stereo/navigation_permitted. Set false when bridge off.",
+    )
+    enable_vehicle_speed_filter_arg = DeclareLaunchArgument(
+        "enable_vehicle_speed_filter",
+        default_value="true",
+        description="Nav2: vehicle speed filter mask node. Set false to save CPU.",
+    )
+    yolo_device_arg = DeclareLaunchArgument(
+        "yolo_device",
+        default_value="0",
+        description="segment_3d ultralytics_tire: 0=cuda:0 or string cpu to avoid GPU OOM.",
+    )
+    depth_registered_publish_hz_arg = DeclareLaunchArgument(
+        "depth_registered_publish_hz",
+        default_value="0.0",
+        description="segment_3d: max registered pointcloud rate (Hz); 0.0=full rate (must be float for depth_to_registered_pointcloud_node).",
     )
 
     # 0) Motor driver — subscribes to cmd_vel, forwards to ESP32; optionally publishes /wheel/odometry
@@ -166,6 +293,7 @@ def generate_launch_description():
         launch_arguments={
             "ip_address": LaunchConfiguration("ip_address"),
             "use_bridge": LaunchConfiguration("use_bridge"),
+            "enable_semantic_segmentation": LaunchConfiguration("enable_semantic_segmentation"),
         }.items(),
     )
 
@@ -192,9 +320,15 @@ def generate_launch_description():
             "prefer_tensorrt_inspection": LaunchConfiguration("prefer_tensorrt_inspection"),
             "wheel_max_det": LaunchConfiguration("wheel_max_det"),
             "wheel_imgsz": LaunchConfiguration("wheel_imgsz"),
+            "tyre_onnx_imgsz": LaunchConfiguration("tyre_onnx_imgsz"),
+            "wheel_inspection_model": LaunchConfiguration("wheel_inspection_model"),
             "wheel_confidence": LaunchConfiguration("wheel_confidence"),
             "model_load_delay_s": LaunchConfiguration("model_load_delay_s"),
             "inference_interval_s": LaunchConfiguration("inference_interval_s", default="0.1"),
+            "enable_tyre_3d_projection": LaunchConfiguration("enable_tyre_3d_projection"),
+            "tyre_3d_sync_slop_s": LaunchConfiguration("tyre_3d_sync_slop_s"),
+            "tyre_3d_depth_pairing_mode": LaunchConfiguration("tyre_3d_depth_pairing_mode"),
+            "tyre_3d_tf_lookup_use_latest": LaunchConfiguration("tyre_3d_tf_lookup_use_latest"),
             "use_cpu_inference": LaunchConfiguration("use_cpu_inference"),
             "sim_tyre_detections": LaunchConfiguration("sim_tyre_detections"),
             "use_yolo": PythonExpression([
@@ -203,8 +337,12 @@ def generate_launch_description():
             ]),
             "pcl_fallback_enabled": PythonExpression([
                 "'false' if '", LaunchConfiguration("sim_tyre_detections"),
-                "' == 'true' else 'true'",
+                "' == 'true' else '", LaunchConfiguration("pcl_fallback_enabled"), "'",
             ]),
+            "minimal_perception": LaunchConfiguration("minimal_perception"),
+            "centroid_servo_enabled": LaunchConfiguration("centroid_servo_enabled"),
+            "device": LaunchConfiguration("yolo_device"),
+            "depth_registered_publish_hz": LaunchConfiguration("depth_registered_publish_hz"),
         }.items(),
     )
     segment_3d_delayed = TimerAction(period=8.0, actions=[segment_3d_launch])
@@ -227,6 +365,10 @@ def generate_launch_description():
             "use_ekf": LaunchConfiguration("use_ekf"),
             "nav2_log_level": LaunchConfiguration("nav2_log_level", default="info"),
             "sim_tyre_detections": LaunchConfiguration("sim_tyre_detections"),
+            "costmap_resolution": LaunchConfiguration("costmap_resolution"),
+            "enable_cmd_vel_mux": LaunchConfiguration("enable_cmd_vel_mux"),
+            "enable_depth_gate": LaunchConfiguration("enable_depth_gate"),
+            "enable_vehicle_speed_filter": LaunchConfiguration("enable_vehicle_speed_filter"),
         }.items(),
     )
     nav_aurora_delayed = TimerAction(period=10.0, actions=[nav_aurora_launch])
@@ -259,9 +401,25 @@ def generate_launch_description():
                 "' == 'true' else '/aurora_semantic/vehicle_bounding_boxes'",
             ]),
             "require_nav_permitted": LaunchConfiguration("require_nav_permitted"),
+            "use_tyre_3d_positions": LaunchConfiguration("use_tyre_3d_positions"),
+            "require_detection_topic_at_startup": LaunchConfiguration(
+                "require_detection_topic_at_startup"
+            ),
+            "demo_mode": LaunchConfiguration("demo_mode"),
+            "demo_simulate_nav_success_topic": LaunchConfiguration("demo_simulate_nav_success_topic"),
+            "use_tyre_geometry": LaunchConfiguration("use_tyre_geometry"),
+            "use_batch_waypoints": LaunchConfiguration("use_batch_waypoints"),
         }.items(),
     )
-    inspection_delayed = TimerAction(period=120.0, actions=[inspection_launch])
+    def _inspection_timer_action(context):
+        raw = perform_substitutions(context, [LaunchConfiguration("inspection_delay_s")]).strip()
+        try:
+            delay = float(raw)
+        except ValueError:
+            delay = 90.0
+        return [TimerAction(period=max(5.0, delay), actions=[inspection_launch])]
+
+    inspection_delayed = OpaqueFunction(function=_inspection_timer_action)
 
     # Sim tyre detections: run verify_system.py --simulate --publish-objects-segment
     # Publishes to /sim/vehicle_bounding_boxes and /sim/tire_bounding_boxes_merged so
@@ -289,15 +447,38 @@ def generate_launch_description():
         set_rmw,
         ip_address_arg,
         require_nav_permitted_arg,
+        use_tyre_3d_positions_arg,
+        inspection_delay_s_arg,
+        require_detection_topic_at_startup_arg,
+        demo_mode_arg,
+        demo_simulate_nav_success_topic_arg,
+        use_tyre_geometry_arg,
+        use_batch_waypoints_arg,
+        enable_tyre_3d_projection_arg,
+        tyre_3d_sync_slop_s_arg,
+        tyre_3d_depth_pairing_mode_arg,
+        tyre_3d_tf_lookup_use_latest_arg,
+        minimal_perception_arg,
+        pcl_fallback_enabled_arg,
+        centroid_servo_enabled_arg,
         params_file_arg,
         reset_map_arg,
         nav2_log_level_arg,
         prefer_tensorrt_inspection_arg,
         wheel_max_det_arg,
         wheel_imgsz_arg,
+        tyre_onnx_imgsz_arg,
         wheel_confidence_arg,
         model_load_delay_arg,
         inference_interval_s_arg,
+        wheel_inspection_model_arg,
+        enable_semantic_segmentation_arg,
+        costmap_resolution_arg,
+        enable_cmd_vel_mux_arg,
+        enable_depth_gate_arg,
+        enable_vehicle_speed_filter_arg,
+        yolo_device_arg,
+        depth_registered_publish_hz_arg,
         use_cpu_inference_arg,
         use_bridge_arg,
         perception_only_arg,

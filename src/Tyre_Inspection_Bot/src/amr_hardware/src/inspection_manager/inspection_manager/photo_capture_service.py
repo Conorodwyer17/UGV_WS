@@ -36,6 +36,8 @@ class PhotoCaptureService(Node):
         self.declare_parameter('photo_capture_topic', '/inspection_manager/capture_photo')
         self.declare_parameter('capture_result_topic', '/inspection_manager/capture_result')
         self.declare_parameter('metadata_max_age_s', 2.0)
+        # Publish last saved frame for RViz / rqt_image_view (thesis demo); empty = disabled
+        self.declare_parameter('publish_display_topic', '/captured_photo_display')
         
         camera_topic = self.get_parameter('camera_topic').value
         photo_capture_topic = self.get_parameter('photo_capture_topic').value
@@ -92,6 +94,11 @@ class PhotoCaptureService(Node):
         # Phase G: Publish capture result for validation (topic from params; inspection_manager subscribes to capture_result_topic)
         self.capture_result_pub = self.create_publisher(
             String, capture_result_topic, 10
+        )
+        disp_topic = (self.get_parameter('publish_display_topic').value or '').strip()
+        self._display_topic = disp_topic
+        self._display_pub = (
+            self.create_publisher(Image, disp_topic, 10) if disp_topic else None
         )
 
         # Manual trigger service for debugging: ros2 service call /photo_capture_service/capture_photo std_srvs/srv/Trigger
@@ -222,6 +229,14 @@ class PhotoCaptureService(Node):
                 f"Photo captured: {filename} "
                 f"(Resolution: {cv_image.shape[1]}x{cv_image.shape[0]}, {size_bytes} bytes)"
             )
+            if self._display_pub is not None:
+                try:
+                    out = self.bridge.cv2_to_imgmsg(cv_image, "bgr8")
+                    out.header.stamp = self.get_clock().now().to_msg()
+                    out.header.frame_id = "camera_color_optical_frame"
+                    self._display_pub.publish(out)
+                except Exception as e:
+                    self.get_logger().debug(f"Display image publish skipped: {e}")
             self._publish_capture_result(True, filename, size_bytes)
             return True
 

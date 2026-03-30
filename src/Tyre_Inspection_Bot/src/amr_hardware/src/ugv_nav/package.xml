@@ -10,6 +10,8 @@
   <buildtool_depend>ament_cmake</buildtool_depend>
 
   <exec_depend>nav2_bringup</exec_depend>
+  <exec_depend>inspection_waypoint_plugins</exec_depend>
+  <exec_depend>nonpersistent_voxel_layer</exec_depend>
   <exec_depend>gb_visual_detection_3d_msgs</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>nav2_msgs</exec_depend>

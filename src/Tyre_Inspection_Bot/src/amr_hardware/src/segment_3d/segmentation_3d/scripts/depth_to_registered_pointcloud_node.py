@@ -21,6 +21,7 @@ class DepthToRegisteredPointCloudNode(Node):
         self.declare_parameter("output_topic", "/segmentation_processor/registered_pointcloud")
         self.declare_parameter("output_frame_id", "camera_depth_optical_frame")
         self.declare_parameter("depth_points_topic", "/camera/depth/points")  # also publish here for Nav2 costmap
+        self.declare_parameter("publish_rate_hz", 0.0)  # 0 = publish every frame; else max rate (Hz)
 
         self.depth_topic = self.get_parameter("depth_topic").value
         self.camera_info_topic = self.get_parameter("camera_info_topic").value
@@ -45,10 +46,16 @@ class DepthToRegisteredPointCloudNode(Node):
         )
         self.pub = self.create_publisher(PointCloud2, self.output_topic, qos_be)
         self.pub_depth_points = self.create_publisher(PointCloud2, self.depth_points_topic, qos_be) if self.depth_points_topic else None
+        _pr = self.get_parameter("publish_rate_hz").value
+        if isinstance(_pr, int):
+            _pr = float(_pr)
+        self._publish_rate_hz = float(_pr if _pr is not None else 0.0)
+        self._last_publish_time = None
 
         self.get_logger().info(
             f"depth_to_registered_pointcloud: depth={self.depth_topic} "
-            f"camera_info={self.camera_info_topic} -> {self.output_topic}"
+            f"camera_info={self.camera_info_topic} -> {self.output_topic} "
+            f"publish_rate_hz={self._publish_rate_hz}"
         )
 
     def _camera_info_cb(self, msg: CameraInfo):
@@ -64,6 +71,14 @@ class DepthToRegisteredPointCloudNode(Node):
     def _depth_cb(self, msg: Image):
         if not self.camera_info_received or self.fx is None:
             return
+        if self._publish_rate_hz > 0.0:
+            now = self.get_clock().now()
+            min_interval_ns = int(1e9 / self._publish_rate_hz)
+            if self._last_publish_time is not None:
+                dt_ns = (now - self._last_publish_time).nanoseconds
+                if dt_ns < min_interval_ns:
+                    return
+            self._last_publish_time = now
 
         try:
             depth = self.bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")

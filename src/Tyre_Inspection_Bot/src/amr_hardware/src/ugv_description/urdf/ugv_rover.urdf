@@ -1,7 +1,8 @@
 <?xml version="1.0" ?>
 <robot
   name="ugv_rover">
-  <link name="base_footprint"></link>
+  <!-- base_footprint: published by world_frame_tf_publisher (base_link->base_footprint, z=-0.08)
+       with current timestamps. Not in URDF to avoid stamp 0 delay. -->
   <link
     name="base_link">
     <inertial>
@@ -43,11 +44,6 @@
     </collision>
   </link>
 
-  <joint name="base_joint" type="fixed">
-    <parent link="base_footprint"/>
-    <child link="base_link"/>
-    <origin xyz="0.000460087791654118 6.50856019576702E-10 0.08" rpy="0 0 0"/> 
-  </joint>
   
   <link name="base_imu_link"> 
       <origin xyz="0 0 0" rpy="0 0 0"/> 
@@ -304,15 +300,10 @@
     <origin xyz="0.03 0 0" rpy="0 0 -1.5708"/>  <!-- -90 deg Z per Aurora SDK -->
   </joint>
 
-  <link name="camera_depth_optical_frame">
-    <inertial><mass value="0.001"/><inertia ixx="0.000001" ixy="0" ixz="0" iyy="0.000001" iyz="0" izz="0.000001"/></inertial>
-  </link>
-  <joint name="camera_depth_optical_joint" type="fixed">
-    <parent link="camera_left"/>
-    <child link="camera_depth_optical_frame"/>
-    <origin xyz="0 0 0" rpy="0 0 0"/>  <!-- Identity: depth optical aligns with camera_left -->
-  </joint>
-  
+  <!-- camera_depth_optical_frame: NOT in URDF. robot_state_publisher would publish to /tf_static
+       with stamp 0, causing ~67s delay and nav2 obstacle layer to reject point clouds.
+       world_frame_tf_publisher publishes base_link->camera_depth_optical_frame to /tf with current time. -->
+
   <!-- Camera Holder: 2 inches (0.0508m) up from base, replacing LiDAR position -->
   <link
     name="camera_holder_link">

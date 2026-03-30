@@ -50,6 +50,11 @@ def send_nav_goal(node, pose, done_cb, feedback_cb=None) -> bool:
         return False
     node._last_nav2_server_available = True
 
+    escape = getattr(node, "escape_lethal_start_if_needed", None)
+    if escape is not None and not escape():
+        node.get_logger().warn("Nav goal refused: start pose still in lethal cost after escape attempts.")
+        return False
+
     x, y, z = pose.pose.position.x, pose.pose.position.y, pose.pose.position.z
     if not (math.isfinite(x) and math.isfinite(y) and math.isfinite(z)):
         node.get_logger().error(
@@ -70,9 +75,9 @@ def send_nav_goal(node, pose, done_cb, feedback_cb=None) -> bool:
 def send_follow_waypoints(
     node, poses: List[PoseStamped], done_cb: Callable
 ) -> bool:
-    """Send a FollowWaypoints goal with 4 tyre poses. Returns True if goal was sent.
+    """Send a FollowWaypoints goal with one or more map-frame poses. Returns True if goal was sent.
     Requires waypoint_follower with stop_on_failure: false (skip unreachable).
-    Use PhotoAtWaypoint plugin for capture in batch mode (no wheel-in-view check).
+    Use waypoint task executor (e.g. PhotoCaptureWaypointTask) for capture at each pose.
     """
     if not getattr(node, "follow_waypoints_client", None):
         node.get_logger().error("FollowWaypoints client not initialized (use_follow_waypoints?).")
@@ -86,6 +91,10 @@ def send_follow_waypoints(
         return False
     if not node.follow_waypoints_client.wait_for_server(timeout_sec=5.0):
         node.get_logger().error("FollowWaypoints action server not available.")
+        return False
+    escape = getattr(node, "escape_lethal_start_if_needed", None)
+    if escape is not None and not escape():
+        node.get_logger().warn("FollowWaypoints refused: start pose still in lethal cost after escape attempts.")
         return False
     for i, p in enumerate(poses):
         x, y, z = p.pose.position.x, p.pose.position.y, p.pose.position.z

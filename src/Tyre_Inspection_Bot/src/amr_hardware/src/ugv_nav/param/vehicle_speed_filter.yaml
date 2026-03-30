@@ -6,7 +6,7 @@ vehicle_speed_filter_node:
     vehicle_boxes_topic: "/aurora_semantic/vehicle_bounding_boxes"
     filter_mask_topic: "/inspection/speed_filter_mask"
     filter_info_topic: "/local_costmap/costmap_filter_info"
-    mask_frame_id: "map"
+    mask_frame_id: "slamware_map"  # match vehicle_boxes; avoids CostmapFilter map->odom extrapolation
     mask_resolution: 0.05
     mask_width_m: 50.0
     mask_height_m: 50.0

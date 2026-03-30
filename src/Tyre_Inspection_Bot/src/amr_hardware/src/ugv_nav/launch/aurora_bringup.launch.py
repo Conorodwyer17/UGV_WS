@@ -41,6 +41,14 @@ def generate_launch_description():
             "Try true after firmware upgrade."
         ),
     )
+    enable_semantic_segmentation_arg = DeclareLaunchArgument(
+        "enable_semantic_segmentation",
+        default_value="true",
+        description=(
+            "Subscribe to Aurora semantic segmentation (uses device/GPU). "
+            "Set false on Jetson OOM to free memory (vehicle boxes must use YOLO or other source)."
+        ),
+    )
 
     slamware_node = Node(
         package='slamware_ros_sdk',
@@ -76,42 +84,18 @@ def generate_launch_description():
         ],
     )
 
-    # TF: map -> slamware_map (identity). Ensures "map" frame exists when Nav2 is not running,
-    # so inspection_manager can transform detections to map.
-    map2slamware = Node(
-        package="tf2_ros",
-        executable="static_transform_publisher",
-        name="map_to_slamware_map",
-        parameters=[{"use_sim_time": False}],
-        arguments=[
-            "--x", "0",
-            "--y", "0",
-            "--z", "0",
-            "--qx", "0",
-            "--qy", "0",
-            "--qz", "0",
-            "--qw", "1",
-            "--frame-id", "map",
-            "--child-frame-id", "slamware_map",
-        ],
+    # TF: map->slamware_map, slamware_map->odom with CURRENT timestamps (not stamp 0).
+    # static_transform_publisher uses stamp 0, causing ~70s delay and costmap rejection.
+    world_frame_tf_script = os.path.join(
+        get_package_prefix("ugv_nav"),
+        "lib",
+        "ugv_nav",
+        "world_frame_tf_publisher.py",
     )
-    # TF: slamware_map -> odom (Aurora provides odom relative to slamware_map).
-    odom2map = Node(
-        package="tf2_ros",
-        executable="static_transform_publisher",
-        name="odom2map",
-        parameters=[{"use_sim_time": False}],
-        arguments=[
-            "--x", "0",
-            "--y", "0",
-            "--z", "0",
-            "--qx", "0",
-            "--qy", "0",
-            "--qz", "0",
-            "--qw", "1",
-            "--frame-id", "slamware_map",
-            "--child-frame-id", "odom",
-        ],
+    world_frame_tf = ExecuteProcess(
+        cmd=[sys.executable, world_frame_tf_script],
+        name="world_frame_tf_publisher",
+        output="screen",
     )
     # Robot state publisher: URDF-based transforms for camera_left, camera_right, imu_link,
     # camera_depth_optical_frame, base_footprint. Ensures correct timestamps (fixes TF extrapolation).
@@ -166,9 +150,9 @@ def generate_launch_description():
         ip_address_arg,
         use_bridge_arg,
         stereo_camera_info_arg,
+        enable_semantic_segmentation_arg,
         slamware_node,
-        map2slamware,
-        odom2map,
+        world_frame_tf,
         robot_state_publisher,
         bridge_launch,
         nav_permitted_pub,

@@ -87,8 +87,15 @@ class UltralyticsSegmentationNode(Node):
         self.declare_parameter("inspection_model", "best_fallback.pt")  # Canonical wheel detection model
         self.declare_parameter("prefer_tensorrt", True)
         self.declare_parameter("prefer_tensorrt_inspection", "auto")  # "auto"|"true"|"false"; auto=use engine if exists
-        # device: launch often passes 0 as int from YAML; declare int, convert to str for YOLO
-        self.declare_parameter("device", 0)
+        # device: string so launch can pass "cpu" or "0" (GPU index); INTEGER type rejected "cpu"
+        self.declare_parameter(
+            "device",
+            "0",
+            ParameterDescriptor(
+                type=ParameterType.PARAMETER_STRING,
+                description="Inference device: 'cpu' or GPU index string e.g. '0' for cuda:0",
+            ),
+        )
         self.declare_parameter("mode_topic", "/segmentation_mode")
         self.declare_parameter("default_mode", "navigation")
         self.declare_parameter("camera_rgb_topic", "/slamware_ros_sdk_server_node/left_image_raw")  # Aurora left camera (default)
@@ -125,19 +132,30 @@ class UltralyticsSegmentationNode(Node):
         nav_model_path = self.get_parameter("navigation_model").value
         insp_model_path = self.get_parameter("inspection_model").value
         prefer_trt = bool(self.get_parameter("prefer_tensorrt").value)
-        dev_val = self.get_parameter("device").value
-        requested = str(dev_val) if dev_val is not None else "0"
-        if not torch.cuda.is_available():
+        dev_raw = self.get_parameter("device").value
+        if isinstance(dev_raw, int):
+            dev_str = str(dev_raw)
+        elif dev_raw is None:
+            dev_str = "0"
+        else:
+            dev_str = str(dev_raw).strip().lower()
+
+        if dev_str == "cpu":
+            self._device = "cpu"
+            self._half = False
+        elif not torch.cuda.is_available():
             self._device = "cpu"
             self._half = False
             self.get_logger().warn(
-                f"CUDA not available (torch.cuda.is_available()=False). Using device=cpu. "
-                f"Requested device={requested} ignored."
+                "CUDA not available (torch.cuda.is_available()=False). Using device=cpu. "
+                f"Requested device={dev_str!r} ignored."
             )
         else:
-            self._device = f"cuda:{requested}" if requested.isdigit() else requested
+            self._device = f"cuda:{dev_str}" if dev_str.isdigit() else dev_str
             half_val = self.get_parameter("half").value
             self._half = half_val if isinstance(half_val, bool) else (str(half_val).lower() == "true")
+            if self._device == "cpu":
+                self._half = False
         self.get_logger().info(f"Using device: {self._device} (half={self._half})")
 
         # Load navigation model only when use_vehicle_yolo is True (saves GPU memory on Jetson)
@@ -184,6 +202,9 @@ class UltralyticsSegmentationNode(Node):
             )
         else:
             prefer_trt_inspection = v if isinstance(v, bool) else (v_str in ("true", "1", "yes"))
+        # TensorRT .engine inference uses GPU; keep .pt when running on CPU to avoid TRT OOM.
+        if self._device == "cpu":
+            prefer_trt_inspection = False
         if prefer_trt and prefer_trt_inspection and resolved_insp_path.endswith(".pt"):
             engine_path = resolved_insp_path[:-2] + "engine"
             if os.path.exists(engine_path):
@@ -399,8 +420,8 @@ class UltralyticsSegmentationNode(Node):
 
         # Prepare the ObjectsSegment message
         objects_msg = ObjectsSegment()
-        objects_msg.header = rgb_data.header  # Copy the header from the RGB image
-        objects_msg.header.stamp = self.get_clock().now().to_msg()
+        # Preserve image stamp for message_filters sync with depth (same as ultralytics_node_cpu).
+        objects_msg.header = rgb_data.header
 
         has_masks = seg_result[0].masks is not None
         if not has_masks:
