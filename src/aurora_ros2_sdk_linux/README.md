@@ -7,7 +7,7 @@ Aurora is a newly developed integrated positioning and mapping sensor by SLAMTEC
 ## Get Started
 ### Directory Structure
 
-The Aurora ROS2 SDK contains the resources and code you may need during your development process. The directory structure is organized as follows:
+The Aurora ROS2 SDK contains the resources and code you may need during your development process. The directory structure is organised as follows:
 
 | Directory              | Description                               |
 | ---------------------- | ----------------------------------------- |
