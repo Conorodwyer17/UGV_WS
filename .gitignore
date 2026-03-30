@@ -1,4 +1,4 @@
-# Build and installation artifacts
+# Build and runtime artefacts
 build/
 install/
 log/
@@ -24,7 +24,7 @@ logs/
 *.swo
 *~
 
-# Personal/thesis files
+# Personal thesis drafts (keep locally; not published in this repository)
 thesis/
 *.bak
 *.orig
@@ -38,34 +38,34 @@ sim/bags/
 *.local
 *.user
 
-# Model files: keep best_fallback.pt and .engine for production.
-# Do not ignore model files.
-
-# Any other temporary or large files
+# Logs and databases
 *.log
 *.out
 *.err
 *.db
 *.sqlite
 
-# Session captures and local diagnostics (not for version control)
+# Large test, training, and session data (keep locally only)
+tyre_training_results/
 diagnostics/
+benchmarks/
 
-# Large benchmark captures (workspace-local only; *.log also matches)
-benchmarks/*.log
+# Captured images and model exports (regenerate via scripts; optional local weights)
+*.jpg
+*.jpeg
+*.png
+*.onnx
+*.engine
 
-# Generated (from original)
+# Other generated or bulky paths
 tire_inspection_photos/
 runs/
-
-# Large local training exports (cloud GPU logs, plots; not required to build)
-tyre_training_results/
 vision_test_logs/
 indoor_test_logs/
 backups/
 tmp/
 
-# Binaries and data
+# Binaries and datasets
 *.deb
 datasets/
 

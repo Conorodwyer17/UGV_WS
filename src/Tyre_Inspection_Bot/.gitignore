@@ -17,14 +17,12 @@ __pycache__/
 *.log
 
 
-# ML weights / datasets (exclude non-essential; keep best_fallback for production)
+# ML weights / datasets (keep best_fallback.pt for production; export ONNX/engine locally)
 *.pt
 *.onnx
 *.engine
 *.tflite
 !best_fallback.pt
-!best_fallback.onnx
-!best_fallback.engine
 
 # Maps / slam artifacts
 *.pbstream

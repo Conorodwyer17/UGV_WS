@@ -138,7 +138,7 @@ These ensure the mission does not spin in circles, knows where it is and where i
 
 **TF tree:** Full chain: map → slamware_map → odom → base_link → base_footprint, camera_left, camera_depth_optical_frame. Required for `verify_system.py` and costmap lookups.
 
-**Nav2 parameters (nav_aurora.yaml):** Controller uses `xy_goal_tolerance: 0.15` m and `yaw_goal_tolerance: 0.25` (tighter yaw e.g. 0.1 can be tried for tire approach but may increase oscillations). `transform_tolerance` is 2.0 s in DWB for Aurora TF timing; a tighter profile (e.g. 1.0 s) is in `nav_aurora_tight_*.yaml` for testing. Recovery behavior tree order: **ClearCostmap** (local then global) → **Wait** → **BackUp** (see `behavior_trees/navigate_to_pose_no_spin.xml`).
+**Nav2 parameters (nav_aurora.yaml):** Controller uses `xy_goal_tolerance: 0.15` m and `yaw_goal_tolerance: 0.25` (tighter yaw e.g. 0.1 can be tried for tire approach but may increase oscillations). `transform_tolerance` is 2.0 s in DWB for Aurora TF timing; a tighter profile (e.g. 1.0 s) is in `nav_aurora_tight_*.yaml` for testing. Recovery behaviour tree order: **ClearCostmap** (local then global) → **Wait** → **BackUp** (see `behavior_trees/navigate_to_pose_no_spin.xml`).
 
 **Costmap:** Local and global costmaps use `/slamware_ros_sdk_server_node/scan` and `/camera/depth/points`. Optionally, `/segmentation_processor/registered_pointcloud` can be added as an extra obstacle source if needed.
 
@@ -146,7 +146,7 @@ These ensure the mission does not spin in circles, knows where it is and where i
 
 ---
 
-## Jetson Optimization and TensorRT
+## Jetson Optimisation and TensorRT
 
 **16 GB Jetson Orin Nano:** GPU tyre detection is now the default. Expected performance: 640×640 resolution, 10 Hz inference, TensorRT when `best_fallback.engine` exists. OOM is rare on 16 GB; fallbacks below apply mainly to 8 GB or older hardware. CPU fallback: `use_cpu_inference:=true` for 8 GB Jetson, debugging, or if OOM persists.
 
@@ -558,7 +558,7 @@ Run `ros2 launch ugv_nav full_bringup.launch.py dry_run:=true`. Expected:
 
 ### Simulation validation (sim vs real)
 
-To ensure simulation matches field behavior:
+To ensure simulation matches field behaviour:
 
 1. **Record mock mission:** With `use_mock:=true` sim running, run `./sim/record_mock_mission.sh` in another terminal. Let the mission complete (or drive via teleop), then Ctrl+C. Bag saved to `sim/bags/mock_mission_YYYYMMDD_HHMMSS/`.
 

@@ -86,7 +86,7 @@ Monitor: `ros2 topic echo /inspection_manager/runtime_diagnostics`.
 
 **CPU load:** Controller 5 Hz, planner 10 Hz; `ultralytics_tire` and `tire_merger` disabled in sim.
 
-**Tire detections:** verify_system tire offsets aligned with vehicle_modeler (2.13, ±0.88) from center. `tire_confirmations_required: 1` in PRODUCTION_CONFIG_SIM.yaml.
+**Tire detections:** verify_system tire offsets aligned with vehicle_modeler (2.13, ±0.88) from centre. `tire_confirmations_required: 1` in PRODUCTION_CONFIG_SIM.yaml.
 
 ---
 
