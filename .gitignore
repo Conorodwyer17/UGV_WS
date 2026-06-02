@@ -29,8 +29,11 @@ thesis/
 *.bak
 *.orig
 
-# Supplementary documentation (keep locally; not published)
-docs/
+# docs/ is tracked — contains operational docs (MISSION_FLOW, TF_REFERENCE, DEPLOYMENT_CHECKLIST, etc.)
+# Large binary thesis exports are excluded below
+docs/*.docx
+docs/*.pdf
+docs/figures/*.stl
 
 # Internal readiness / review notes (keep locally; not published)
 FINAL_READINESS.md
@@ -61,6 +64,8 @@ benchmarks/
 *.jpg
 *.jpeg
 *.png
+# Thesis diagram exports (regenerate with scripts/generate_figures.py)
+!docs/figures/*.png
 *.onnx
 *.engine
 

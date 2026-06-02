@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-click helper for thesis no-motion demo (optional). Review commands before use.
+# One-click helper for no-motion demo / bench test (optional). Review commands before use.
 #
 # Typical workflow (recommended: three terminals):
 #   1) This script or manual: start mission + RViz + auto_advance
@@ -13,7 +13,7 @@ export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}"
 
 RVIZ_CFG="$UGV_WS/src/Tyre_Inspection_Bot/src/amr_hardware/src/ugv_nav/rviz/tyre_inspection_demo.rviz"
 
-echo "=== Tyre inspection no-motion demo (stable_viz) ==="
+echo "=== Tyre inspection no-motion bench demo (stable_viz) ==="
 echo "Workspace: $UGV_WS"
 echo ""
 

@@ -57,9 +57,11 @@ def generate_launch_description():
         output='both',
         parameters=[{
             "ip_address": LaunchConfiguration("ip_address"),
-            "stereo_camera_info_enable": LaunchConfiguration(
-                "stereo_camera_info_enable"
-            ),
+            "stereo_camera_info_enable": LaunchConfiguration("stereo_camera_info_enable"),
+            # enable_semantic_segmentation: controls whether Aurora device processes semantic labels.
+            # Set false on memory-constrained Jetsons; vehicle boxes must then come from YOLO.
+            # Checked by slamware_ros_sdk_server_node/server_workers.cpp.
+            "enable_semantic_segmentation": LaunchConfiguration("enable_semantic_segmentation"),
             "angle_compensate": True,
             "map_frame": "slamware_map",
             "robot_frame": "base_link",

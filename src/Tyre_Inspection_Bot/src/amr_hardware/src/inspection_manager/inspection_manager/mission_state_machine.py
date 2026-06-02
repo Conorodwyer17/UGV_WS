@@ -62,6 +62,9 @@ def set_state(node, new_state: str, cause: str = "unknown") -> None:
         or (new_state == MissionState.WAIT_TIRE_BOX and prev_state == MissionState.VERIFY_CAPTURE)
         or (new_state == MissionState.WAIT_TIRE_BOX and prev_state == MissionState.WAIT_WHEEL_FOR_CAPTURE)
         or (new_state == MissionState.NEXT_VEHICLE and prev_state == MissionState.VERIFY_CAPTURE)
+        # FACE_TIRE timeout/failure → WAIT_TIRE_BOX is a stuck cycle: robot at tyre but can't rotate.
+        # Spin protection detects repeated loops of INSPECT_TIRE→FACE_TIRE→WAIT_TIRE_BOX without progress.
+        or (new_state == MissionState.WAIT_TIRE_BOX and prev_state == MissionState.FACE_TIRE)
     )
     # Return-later requeue is forward progress (retrying deferred tires), not a cycle
     if cause_str == "return_later_requeue" and new_state == MissionState.WAIT_TIRE_BOX:

@@ -3,8 +3,8 @@
 ## Canonical stack and topics
 
 - **Building the workspace:** `cd ~/ugv_ws && colcon build --symlink-install && source install/setup.bash`. Place `best_fallback.pt` (or `best_fallback.engine`) in `src/Tyre_Inspection_Bot/` or workspace root. See [Clean build and cleanup](#clean-build-and-cleanup).
-- **Running a mission:** `./scripts/start_mission.sh` (recommended: disk check, Jetson performance, optional verification, then launch). **Default `MISSION_PROFILE=mission_dedicated_cpu`:** dedicated **`tyre_detection_project/best.pt`** on **CPU** (ONNX `best.onnx` at **480×480**), **real motor**, throttled depth (**2 Hz**), costmap **0.10 m**. Export ONNX if missing: `MODEL_PT=tyre_detection_project/best.pt IMGSZ=480 bash scripts/export_onnx.sh`. Stress / thesis: `MISSION_PROFILE=crash_fallback_seg`. Stub motor: `MISSION_PROFILE=stable_viz`. Or `./scripts/startup.sh`; mission auto-starts when TF and Nav2 are ready. See [Option A: Start mission](#option-a-start-mission-recommended) and [Remote RViz monitoring](#remote-rviz-monitoring-laptop).
-- **Canonical launch:** `full_bringup.launch.py` (e.g. via `scripts/mission_launch.sh` or `scripts/startup.sh`). For real missions on the Jetson, use this launch — it starts the Aurora SDK, motor driver, Nav2, perception, and inspection manager. On **memory-constrained** platforms (e.g. Jetson Orin Nano 8 GB), prefer **modular** `ugv_bringup` demos (`demo_*.launch.py`) for thesis or bench validation; see [Modular demonstration guide](#modular-demonstration-guide-thesis--constrained-jetson). Do not use `inspection_full_mission.launch.py` alone (it does not start the Aurora SDK by default).
+- **Running a mission:** `./scripts/start_mission.sh` (recommended: disk check, Jetson performance, optional verification, then launch). **Default `MISSION_PROFILE=mission_dedicated_cpu`:** dedicated **`tyre_detection_project/best.pt`** on **CPU** (ONNX `best.onnx` at **480×480**), **real motor**, throttled depth (**2 Hz**), costmap **0.10 m**. Export ONNX if missing: `MODEL_PT=tyre_detection_project/best.pt IMGSZ=480 bash scripts/export_onnx.sh`. Stress test: `MISSION_PROFILE=crash_fallback_seg`. Stub motor: `MISSION_PROFILE=stable_viz`. Or `./scripts/startup.sh`; mission auto-starts when TF and Nav2 are ready. See [Option A: Start mission](#option-a-start-mission-recommended) and [Remote RViz monitoring](#remote-rviz-monitoring-laptop).
+- **Canonical launch:** `full_bringup.launch.py` (e.g. via `scripts/mission_launch.sh` or `scripts/startup.sh`). For real missions on the Jetson, use this launch — it starts the Aurora SDK, motor driver, Nav2, perception, and inspection manager. On **memory-constrained** platforms (e.g. Jetson Orin Nano 8 GB), prefer **modular** `ugv_bringup` demos (`demo_*.launch.py`) for bench or subsystem validation; see [Modular demonstration guide](#modular-demonstration-guide-bench--constrained-jetson). Do not use `inspection_full_mission.launch.py` alone (it does not start the Aurora SDK by default).
 - **Simulation (no hardware):** Use `ros2 launch sim vehicle_inspection_sim.launch.py use_mock:=true` for full simulation with synthetic Aurora. Note: `full_bringup.launch.py` does not fully support mock mode; it is intended for real hardware.
 - **Mission node:** **inspection_manager_node**. Flow: IDLE → SEARCH_VEHICLE → WAIT_VEHICLE_BOX → (first goal = **nearest corner**, then tyres 2–4 by distance). See `docs/MISSION_PIPELINE.md` for tyre order and scenario behaviour.
 - **First goal:** Always the **nearest** of the four tire corners (not “front left first” or clockwise). Flow: WAIT_VEHICLE_BOX → APPROACH_VEHICLE → WAIT_TIRE_BOX → INSPECT_TIRE / FACE_TIRE → VERIFY_CAPTURE (repeat tires, then NEXT_VEHICLE or DONE).
@@ -28,7 +28,7 @@
 
 ## Planning test (stub motor, no motion)
 
-To **only validate goals and Nav2 plans in RViz** (no driving), see **`docs/PLANNING_TEST_STUB_MOTOR.md`**. Quick command: `MISSION_PROFILE=stable_viz ./scripts/start_mission.sh --no-verify` (same CPU tyre stack as `mission_dedicated_cpu`, **`sim_no_move:=true`**).
+To **only validate goals and Nav2 plans in RViz** (no driving): `MISSION_PROFILE=stable_viz ./scripts/start_mission.sh --no-verify` (same CPU tyre stack as `mission_dedicated_cpu`, **`sim_no_move:=true`**). This launches the full stack with `stub_motor_node` — Nav2 plans appear in RViz but the base does not move.
 
 ---
 
@@ -169,6 +169,14 @@ python3 -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}');
 ```
 
 Expected: `CUDA available: True` and device name (e.g. Orin). If CUDA is missing on Jetson, install the NVIDIA ARM64 wheel (see Ultralytics assets or [SETUP.md](SETUP.md)).
+
+**Multi-class fallback vs single-class tyre model (timing + GPU VRAM):** Legacy `best_fallback.pt` / `.engine` carries many car-part classes (including `wheel`); production runs use the dedicated single-class tyre weights under `tyre_detection_project/best.pt` (or `.engine`) to reduce per-frame work and avoid worst-case configs. To compare both in isolation (same `imgsz`):
+
+```bash
+cd ~/ugv_ws && python3 scripts/benchmark_vision.py --compare-auto --iterations 200 --input_size 480
+```
+
+Or set paths explicitly, e.g. `--model src/Tyre_Inspection_Bot/best_fallback.pt --compare tyre_detection_project/best.pt`. Output: `docs/vision_benchmark_latest.md` (archived notes stay in `docs/vision_benchmark_results.md`). This reports **YOLO-only GPU peak/allocated memory**, not full **system RAM** (use `tegrastats` with `full_bringup` for that).
 
 **System verifier (pre-mission):** Run the Python verifier after sourcing the workspace (and optionally after the stack is up) to check TF tree, required topics, CUDA, and disk space:
 
@@ -570,7 +578,7 @@ To ensure simulation matches field behaviour:
 
 ---
 
-## Modular demonstration guide (thesis / constrained Jetson)
+## Modular demonstration guide (bench / constrained Jetson)
 
 On **Jetson Orin Nano 8 GB** (and similar), running Aurora + Nav2 + tyre YOLO **together** often exceeds unified memory. For demonstrations, use **one** modular launch at a time from `ugv_bringup` instead of `full_bringup.launch.py`. Each demo sets `RMW_IMPLEMENTATION=rmw_cyclonedds_cpp` (match in all terminals).
 
@@ -590,7 +598,7 @@ Use this for a **single-launch** software demonstration: perception → Nav2 pla
 | 8 | Manual photo: `ros2 service call /photo_capture_service/capture_photo std_srvs/srv/Trigger` |
 | 9 | **Expectation:** The base does **not** move; **`stub_motor`** proves cmd_vel is generated (Nav2) but not applied. |
 
-Further detail and parameter defaults: [Full visualisation demo (no motion)](#full-visualisation-demo-no-motion). For thesis **numbers** (inference ms, costmap before/after), see `thesis/performance_improvements.md`.
+Further detail and parameter defaults: [Full visualisation demo (no motion)](#full-visualisation-demo-no-motion). Benchmark numbers (inference latency, GPU memory) are in `docs/vision_benchmark_results.md`.
 
 | Demo | What it shows | Launch |
 |------|----------------|--------|
@@ -655,7 +663,7 @@ rviz2 -d $(ros2 pkg prefix ugv_bringup)/share/ugv_bringup/config/full_mission_mo
 ros2 service call /photo_capture_service/capture_photo std_srvs/srv/Trigger
 ```
 
-**Thesis-style checklist (stub motor — software pipeline only):**
+**No-motion checklist (stub motor — software pipeline only):**
 
 1. `cd ~/ugv_ws && source install/setup.bash` and launch `demo_full_visualization.launch.py`.
 2. Wait **~100 s** after start (or your `inspection_delay_s`) until `ros2 node list | grep -E 'inspection_manager|photo_capture'` shows both nodes.

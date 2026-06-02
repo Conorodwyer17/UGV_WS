@@ -1,3 +1,30 @@
+"""
+VehicleInspectionManager — mission state machine for autonomous tyre inspection.
+
+Architecture note: this is a large single-class node (~6200 lines). The class implements
+the full mission lifecycle via a 1 Hz _tick() loop and async Nav2 callbacks. Supporting
+logic is split into companion modules:
+  mission_state_machine.py — set_state(), MissionState constants, spin protection
+  mission_policy.py        — TransitionReason enum, StartupInvariants, MissionPolicy
+  geometry_utils.py        — standoff goal computation, quaternion helpers
+  perception_handler.py    — vehicle/tyre box filtering and selection
+  goal_generator.py        — Nav2 goal construction with validity checks
+  navigation_controller.py — send_nav_goal() / send_follow_waypoints() wrappers
+  vehicle_modeler.py       — tyre position estimation from vehicle bounding box
+  tyre_order.py            — FL/FR/RL/RR slot assignment and visit order
+  vehicle_waypoints.py     — perimeter bridge waypoints for far-side tyres
+  tyre_geometry.py         — PCA-based vehicle frame inference from /tyre_3d_positions
+  transformer.py           — TF lookup helpers
+  utils.py                 — capture distance gate, AABB distance
+  alignment.py             — AlignmentController.is_converged() convergence helper (utility only)
+  photo_capture_service.py — photo_capture_service node (launched alongside this node)
+  demo_cycle_tyre_poses.py — synthetic /tyre_3d_positions publisher for bench demos
+
+Mission flow: IDLE → INIT → SEARCH_VEHICLE → WAIT_VEHICLE_BOX → APPROACH_VEHICLE →
+              WAIT_TIRE_BOX → INSPECT_TIRE → FACE_TIRE → WAIT_WHEEL_FOR_CAPTURE →
+              VERIFY_CAPTURE → (loop tyres) → NEXT_VEHICLE → DONE
+See docs/MISSION_FLOW.md for the full state diagram.
+"""
 import json
 import math
 import os
@@ -4186,7 +4213,7 @@ class VehicleInspectionManager(Node):
                 timeout_s = float(self.get_parameter("face_tire_timeout_s").value)
                 if (time.time() - self._face_tire_start_time) > timeout_s:
                     self.get_logger().warn(
-                        f"Face tire timeout ({timeout_s}s); cancelling rotation and returning to WAIT_TIRE_BOX."
+                        f"Face tire timeout ({timeout_s}s); cancelling rotation and attempting capture from current orientation."
                     )
                     self._mission_log_append(
                         "face_tire_timeout",
@@ -4201,7 +4228,12 @@ class VehicleInspectionManager(Node):
                         self._active_nav_goal_handle = None
                     self._face_tire_start_time = None
                     self._face_tire_target_yaw = None
-                    self._set_state(MissionState.WAIT_TIRE_BOX, cause="face_tire_timeout")
+                    # Robot is physically at the tyre. Attempt capture rather than discarding
+                    # this tyre entirely — face alignment failed but position is correct.
+                    if self.get_parameter("capture_require_wheel_detection").value:
+                        self._set_state(MissionState.WAIT_WHEEL_FOR_CAPTURE, cause="face_tire_timeout")
+                    else:
+                        self._trigger_tire_capture()
             return
 
         if self.current_state == MissionState.WAIT_WHEEL_FOR_CAPTURE:
@@ -6047,9 +6079,14 @@ class VehicleInspectionManager(Node):
                     else:
                         self._trigger_tire_capture()
                     return
-            self.get_logger().warn("Face tire rotation failed; returning to WAIT_TIRE_BOX.")
+            # Rotation failed but robot is physically at the tyre position.
+            # Attempt capture from current orientation rather than discarding this tyre.
+            self.get_logger().warn("Face tire rotation failed; attempting capture from current orientation.")
             self._stop_robot()
-            self._set_state(MissionState.WAIT_TIRE_BOX, cause="face_tire_failed")
+            if self.get_parameter("capture_require_wheel_detection").value:
+                self._set_state(MissionState.WAIT_WHEEL_FOR_CAPTURE, cause="face_tire_failed")
+            else:
+                self._trigger_tire_capture()
             return
         if self.get_parameter("capture_require_wheel_detection").value:
             self._set_state(MissionState.WAIT_WHEEL_FOR_CAPTURE, cause="face_tire_done")

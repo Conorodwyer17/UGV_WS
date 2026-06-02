@@ -1,5 +1,5 @@
-# Example GitHub Actions pipeline for tyre-inspection stack
-# Place in .github/workflows/ci.yml
+# GitHub Actions pipeline for tyre-inspection stack
+# Place in .github/workflows/ci.yml to enable on push/PR.
 
 name: CI
 
@@ -10,22 +10,53 @@ on:
     branches: [main]
 
 jobs:
-  build-and-test:
+  unit-tests:
+    name: Unit tests (no ROS required)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install test deps
+        run: pip install pytest pytest-cov
+
+      - name: Run unit tests
+        env:
+          PYTHONPATH: src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager
+        run: |
+          python -m pytest \
+            src/Tyre_Inspection_Bot/src/amr_hardware/src/inspection_manager/test/ \
+            -v --tb=short --cov=inspection_manager --cov-report=term-missing
+
+  ros-build-test:
+    name: ROS 2 build + colcon test
     runs-on: ubuntu-22.04
     container:
       image: ros:humble-ros-base-jammy
     steps:
       - uses: actions/checkout@v4
+
       - name: Install deps
         run: |
-          apt-get update && apt-get install -y python3-pip python3-colcon-common-extensions
+          apt-get update && apt-get install -y \
+            python3-pip python3-colcon-common-extensions \
+            python3-colcon-ros python3-pytest
           pip3 install pytest
-      - name: Build
+
+      - name: Build workspace
         run: |
           . /opt/ros/humble/setup.sh
-          cd src/Tyre_Inspection_Bot && colcon build --symlink-install
-      - name: Run tests
+          colcon build --symlink-install \
+            --packages-ignore slamware_ros_sdk aurora_ros2_sdk_linux \
+            --event-handlers console_direct+
+
+      - name: Run colcon tests
         run: |
           . install/setup.bash
-          colcon test --packages-select segmentation_3d
-          colcon test-result --all
+          colcon test \
+            --packages-select inspection_manager segmentation_3d ugv_nav
+          colcon test-result --all --verbose

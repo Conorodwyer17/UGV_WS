@@ -2,8 +2,7 @@ import os
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
-from launch.conditions import IfCondition
-from launch.substitutions import LaunchConfiguration, PythonExpression
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 
@@ -13,10 +12,6 @@ def generate_launch_description():
     vehicle_fallback_topic = LaunchConfiguration("vehicle_fallback_topic")
     image_topic = LaunchConfiguration("image_topic")
     params_file = LaunchConfiguration("params_file")
-    camera_info_topic = LaunchConfiguration("camera_info_topic")
-    use_navigation_action = LaunchConfiguration("use_navigation_action")
-    launch_visual_servo = LaunchConfiguration("launch_visual_servo")
-    perception_only_mode = LaunchConfiguration("perception_only_mode")
     return LaunchDescription(
         [
             DeclareLaunchArgument(
@@ -37,32 +32,17 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "image_topic",
                 default_value="/slamware_ros_sdk_server_node/left_image_raw",
-                description="Live camera topic used for photo capture",
-            ),
-            DeclareLaunchArgument(
-                "camera_info_topic",
-                default_value="/camera/depth/camera_info",
-                description="Camera info topic for metadata",
-            ),
-            DeclareLaunchArgument(
-                "use_navigation_action",
-                default_value="true",
-                description="Use real NavigateToPose action (disable for integration simulation).",
-            ),
-            DeclareLaunchArgument(
-                "launch_visual_servo",
-                default_value="true",
-                description="Launch built-in visual_servo align action server.",
+                description="Camera topic for photo capture",
             ),
             DeclareLaunchArgument(
                 "perception_only_mode",
                 default_value="false",
-                description="Disable all movement (Nav2, visual_servo, cmd_vel). For perception validation only.",
+                description="Disable all movement (Nav2, cmd_vel). For perception validation only.",
             ),
             DeclareLaunchArgument(
                 "save_directory",
                 default_value="~/ugv_ws/tire_inspection_photos",
-                description="Directory to save captured tire inspection photos",
+                description="Directory to save captured tyre inspection photos",
             ),
             DeclareLaunchArgument(
                 "params_file",
@@ -80,42 +60,42 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "sensor_health_timeout",
                 default_value="30.0",
-                description="Seconds to wait for sensor health in INIT before proceeding to SEARCH_VEHICLE.",
+                description="Seconds to wait for sensor health in INIT.",
             ),
             DeclareLaunchArgument(
                 "require_nav_permitted",
                 default_value="true",
-                description="Gate goals on /stereo/navigation_permitted. Set false for headless runs without depth gate.",
+                description="Gate goals on /stereo/navigation_permitted.",
             ),
             DeclareLaunchArgument(
                 "use_tyre_3d_positions",
                 default_value="false",
-                description="When true, mission can navigate from /tyre_3d_positions (tyre_3d_projection_node) instead of vehicle boxes.",
+                description="Navigate from /tyre_3d_positions when true.",
             ),
             DeclareLaunchArgument(
                 "require_detection_topic_at_startup",
                 default_value="true",
-                description="If false, startup does not wait for tire merge topic (use with tyre_3d only / minimal perception).",
+                description="Wait for tire merge topic at startup.",
             ),
             DeclareLaunchArgument(
                 "demo_mode",
                 default_value="false",
-                description="Bypass photo distance gates (stub motor / no-motion thesis demo).",
+                description="Bypass photo distance gates (stub motor / no-motion bench demo).",
             ),
             DeclareLaunchArgument(
                 "demo_simulate_nav_success_topic",
                 default_value="",
-                description="Subscribe to std_msgs/Empty on this topic → synthetic Nav2 arrival in INSPECT_TIRE when demo_mode (e.g. /navigation_success).",
+                description="Empty msg on this topic → synthetic Nav2 arrival in INSPECT_TIRE when demo_mode.",
             ),
             DeclareLaunchArgument(
                 "use_tyre_geometry",
                 default_value="true",
-                description="Infer vehicle axes and visit order from /tyre_3d_positions (stable) instead of jittery vehicle box when possible.",
+                description="Infer vehicle axes from /tyre_3d_positions when possible.",
             ),
             DeclareLaunchArgument(
                 "use_batch_waypoints",
                 default_value="false",
-                description="Use Nav2 FollowWaypoints with full map-frame approach list (perimeter+standoff per tyre).",
+                description="Use FollowWaypoints with full perimeter+standoff list.",
             ),
             Node(
                 package="inspection_manager",
@@ -145,9 +125,7 @@ def generate_launch_description():
                         "vehicle_boxes_topic": vehicle_fallback_topic,
                         "sensor_health_timeout": LaunchConfiguration("sensor_health_timeout", default="30.0"),
                         "require_nav_permitted": LaunchConfiguration("require_nav_permitted", default="true"),
-                        "use_tyre_3d_positions": LaunchConfiguration(
-                            "use_tyre_3d_positions", default="false"
-                        ),
+                        "use_tyre_3d_positions": LaunchConfiguration("use_tyre_3d_positions", default="false"),
                         "require_detection_topic_at_startup": LaunchConfiguration(
                             "require_detection_topic_at_startup", default="true"
                         ),
@@ -156,23 +134,9 @@ def generate_launch_description():
                             "demo_simulate_nav_success_topic", default=""
                         ),
                         "use_tyre_geometry": LaunchConfiguration("use_tyre_geometry", default="true"),
-                        "use_batch_waypoints": LaunchConfiguration(
-                            "use_batch_waypoints", default="false"
-                        ),
+                        "use_batch_waypoints": LaunchConfiguration("use_batch_waypoints", default="false"),
                     },
                 ],
-            ),
-            Node(
-                package="inspection_manager",
-                executable="visual_servo_align_server",
-                name="visual_servo_align_server",
-                output="screen",
-                parameters=[{"use_sim_time": LaunchConfiguration("use_sim_time", default="false")}],
-                condition=IfCondition(
-                    PythonExpression(
-                        ["'", launch_visual_servo, "' == 'true' and '", perception_only_mode, "' != 'true'"]
-                    )
-                ),
             ),
         ]
     )

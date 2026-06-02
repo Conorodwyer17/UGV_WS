@@ -120,11 +120,6 @@ def generate_launch_description():
         default_value="false",
         description="Do not block startup on merged tire topic; segment_3d publishes /darknet_ros_3d/tire_bounding_boxes",
     )
-    launch_visual_servo_arg = DeclareLaunchArgument(
-        "launch_visual_servo",
-        default_value="false",
-        description="Omit visual_servo_align_server in the demo to save CPU",
-    )
     inspection_delay_s_arg = DeclareLaunchArgument(
         "inspection_delay_s",
         default_value="100.0",
@@ -257,7 +252,6 @@ def generate_launch_description():
                             ),
                             "tire_detection_topic": "/darknet_ros_3d/tire_bounding_boxes",
                             "vehicle_fallback_topic": "/aurora_semantic/vehicle_bounding_boxes",
-                            "launch_visual_servo": LaunchConfiguration("launch_visual_servo"),
                             "perception_only_mode": "false",
                         }.items(),
                     )
@@ -286,7 +280,6 @@ def generate_launch_description():
             use_tyre_3d_positions_arg,
             require_nav_permitted_arg,
             require_detection_topic_at_startup_arg,
-            launch_visual_servo_arg,
             inspection_delay_s_arg,
             stub_motor,
             aurora_bringup,

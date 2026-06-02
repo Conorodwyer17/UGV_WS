@@ -1,6 +1,6 @@
 # System Architecture – Autonomous Tyre Inspection Robot
 
-This document describes the overall architecture of the UGV tyre inspection system: hardware, ROS 2 node graph, TF tree, and data flow.
+Current platform: Waveshare UGV Rover + SLAMTEC Aurora + Jetson Orin Nano. See [RUNBOOK.md](RUNBOOK.md) for operation.
 
 ## 1. Hardware Overview
 
